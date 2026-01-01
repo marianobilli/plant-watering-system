@@ -1,4 +1,4 @@
-# POC Wiring Guide - Arduino UNO R4 WiFi with MOSFET Pump Control
+P# POC Wiring Guide - Arduino UNO R4 WiFi with MOSFET Pump Control
 
 ## Pin Assignments
 
@@ -6,7 +6,7 @@
 
 | Function | Arduino Pin | Notes |
 |----------|------------|-------|
-| Soil Moisture Sensor (ADC) | A0 | Analog input |
+| Soil Moisture Sensßor (ADC) | A0 | Analog input |
 | Sensor Power Control | D2 | Powers sensor only during readings |
 | Pump MOSFET Control | D3 | Controls IRLZ44N gate |
 | LCD SDA (I2C Data) | SDA (A4) | Default I2C SDA |
