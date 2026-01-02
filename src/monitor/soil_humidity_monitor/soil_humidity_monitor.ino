@@ -217,8 +217,8 @@ void loop() {
     // Handle button input (always responsive)
     handleButtons();
 
-    // Update display if on status screen
-    if (currentState == STATUS_SCREEN &&
+    // Update display if on status screen AND backlight is on
+    if (currentState == STATUS_SCREEN && backlightOn &&
         currentTime - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
         lastDisplayUpdate = currentTime;
         currentMoisture = readMoisture();
@@ -628,6 +628,11 @@ void wakeBacklight() {
     if (!backlightOn) {
         lcd.backlight();
         backlightOn = true;
+        // Take fresh reading when waking up on status screen
+        if (currentState == STATUS_SCREEN) {
+            currentMoisture = readMoisture();
+            displayMenu();
+        }
     }
 }
 
@@ -701,12 +706,14 @@ void handleDownButton() {
             break;
 
         case SETTINGS_MENU:
-            settingsIndex = (settingsIndex < 0) ? settingsIndex + 1 : 0;
+            // Only 1 item in Settings menu, keep at index 0
+            settingsIndex = 0;
             displayMenu();
             break;
 
         case CALIBRATE_MENU:
-            calibrateIndex = (calibrateIndex < 0) ? calibrateIndex + 1 : 0;
+            // Only 1 item in Calibrate menu, keep at index 0
+            calibrateIndex = 0;
             displayMenu();
             break;
 
@@ -720,7 +727,14 @@ void handleDownButton() {
 void handleSelectButton() {
     switch (currentState) {
         case STATUS_SCREEN:
+            // First SELECT press: show main menu
+            currentState = MAIN_MENU;
+            menuIndex = 0;
+            displayMenu();
+            break;
+
         case MAIN_MENU:
+            // Second SELECT press: enter the selected submenu
             switch (menuIndex) {
                 case 0: // Settings
                     currentState = SETTINGS_MENU;
@@ -931,17 +945,19 @@ void displayMenu() {
 
         case CAL_SENSOR_WATER:
             lcd.setCursor(0, 0);
-            lcd.print(F("Put in WATER"));
+            lcd.print(F("Wet soil/water"));
             lcd.setCursor(0, 1);
             lcd.print(F("Press SELECT"));
             break;
 
         case CAL_SENSOR_DONE:
             lcd.setCursor(0, 0);
-            lcd.print(F("Cal Complete!"));
-            lcd.setCursor(0, 1);
-            lcd.print(F("Dry:"));
+            lcd.print(F("Saved! D:"));
             lcd.print(config.sensorDry);
+            lcd.setCursor(0, 1);
+            lcd.print(F("W:"));
+            lcd.print(config.sensorWet);
+            lcd.print(F(" SEL=OK"));
             break;
 
         case DOWNLOAD_CONFIRM:
