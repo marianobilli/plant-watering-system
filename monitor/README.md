@@ -11,10 +11,20 @@ A simplified monitoring-only variant designed to help you understand your plant'
 1. **Waterproof sensor** (2 coats clear nail polish, dry 24h)
 2. **Wire components** per schematic (20 connections)
 3. **Upload firmware** via Arduino IDE (30 seconds)
-4. **Calibrate sensor** (Main Menu → Calibrate → air + water)
+4. **Calibrate sensor** (Main Menu → Calibrate → Run Wizard)
+   - Watch live ADC values, wait for stabilization, press SELECT
 5. **Insert in soil** → Auto-logging begins!
+   - Status screen shows moisture % and raw ADC value
 
 **After 2 weeks:** Download CSV via Serial Monitor (115200 baud) → Analyze in Excel/Python
+
+### Key Features (v1.1)
+
+- **Real-time ADC monitoring:** Status screen shows both moisture % and raw sensor value
+- **Live calibration feedback:** Watch ADC values stabilize during calibration (updates every 0.5s)
+- **Manual calibration editing:** Fine-tune dry/wet values without re-running calibration wizard
+- **Enhanced diagnostics:** System Info displays calibration values and current settings
+- **Improved UX:** Better visual feedback and more control over sensor configuration
 
 ---
 
@@ -68,7 +78,7 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 | | Pin 2 | GND | |
 | **USB Cable** | USB-C | Arduino USB port | Power + Serial data |
 
-**Complete schematic:** See [`soil_humidity_monitor.kicad_sch`](soil_humidity_monitor.kicad_sch)
+**Complete schematic:** See [`kicad/soil_humidity_monitor.kicad_sch`](kicad/soil_humidity_monitor.kicad_sch)
 
 ### Assembly Steps
 
@@ -128,7 +138,7 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 ### Upload Steps
 
 1. **Open Firmware:**
-   - File → Open → Navigate to `soil_humidity_monitor.ino`
+   - File → Open → Navigate to `monitor/src/soil_humidity_monitor.ino`
 
 2. **Configure Board:**
    - Tools → Board → Arduino UNO R4 WiFi
@@ -139,8 +149,9 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
    - Wait for "Done uploading" message (~30 seconds)
 
 4. **Verify:**
-   - LCD should display: "Plant Monitor" and "Initializing..."
-   - Status screen should appear with "Moisture: --%" and "Log: 0/1344"
+   - LCD should display: "Soil Monitor" / "v1.1"
+   - Status screen should appear with "M:--% ADC:0" / "Log:0/1344"
+   - Serial Monitor (115200 baud) should show: "Soil Humidity Monitor v1.1"
 
 **Troubleshooting Upload Errors:**
 - **Port not found:** Install CH340 USB drivers
@@ -155,51 +166,77 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 
 LCD displays:
 ```
-Plant Monitor
-Initializing...
+Soil Monitor
+v1.1
 ```
 
 Then automatically shows **Status Screen**:
 ```
-Moisture: --%
+M:--% ADC:0
 Log:0/1344
 ```
+
+**Note:** Moisture shows "--%" and ADC shows 0 until first sensor reading is taken (after calibration).
 
 ### 2. Sensor Calibration (REQUIRED)
 
 **Why?** Each sensor has different ADC values for dry/wet conditions. Calibration ensures accurate 0-100% readings.
 
-**Steps:**
+**Method 1: Calibration Wizard (Recommended)**
 
 1. **Enter Menu:**
    - Press SELECT button (LCD backlight turns on)
-   - Display shows: "Main Menu" / "1. Settings"
+   - Display shows: "Main Menu" / ">Settings"
 
 2. **Navigate to Calibrate:**
-   - Press DOWN button twice
-   - Display shows: "Main Menu" / "2. Calibrate Sensor"
+   - Press DOWN button once
+   - Display shows: "Main Menu" / ">Calibrate"
    - Press SELECT
+   - Display shows: "CALIBRATE" / ">Run Wizard"
+   - Press SELECT to start wizard
 
 3. **Dry Calibration:**
-   - Display shows: "Hold sensor in AIR" / "Press SELECT"
+   - Display shows: "Hold in AIR" / "ADC:XXXXX SEL=OK"
    - Hold sensor in open air (not touching anything)
-   - Wait 2 seconds for stable reading
-   - Press SELECT
-   - Display shows: "Dry value: XXXX" (e.g., 12400)
+   - **Watch ADC value update every 0.5 seconds** (live reading)
+   - Wait until value stabilizes (stops changing)
+   - Press SELECT to capture dry value
+   - Typical dry value: 12,000-14,000
 
 4. **Wet Calibration:**
-   - Display shows: "Put sensor in WATER" / "Press SELECT"
+   - Display shows: "Wet soil/water" / "ADC:XXXXX SEL=OK"
    - Submerge sensor probes in glass of water (don't submerge entire PCB!)
-   - Wait 2 seconds for water to saturate sensor
-   - Press SELECT
-   - Display shows: "Wet value: XXXX" (e.g., 6000)
+   - **Watch ADC value update every 0.5 seconds** (live reading)
+   - Wait until value stabilizes (usually 2-3 seconds)
+   - Press SELECT to capture wet value
+   - Typical wet value: 4,000-8,000
 
 5. **Confirmation:**
-   - Display shows: "Calibration saved!" / "(values in EEPROM)"
-   - Press BACK to return to Main Menu
-   - Press BACK again to return to Status Screen
+   - Display shows: "Saved! D:12400" / "W:6000 SEL=OK"
+   - Shows both calibrated values
+   - Press SELECT to return to Calibrate menu
+   - Press BACK twice to return to Status Screen
+
+**Method 2: Manual Edit (Advanced)**
+
+If you know the correct ADC values or want to fine-tune calibration:
+
+1. Main Menu → Calibrate → DOWN → "Edit Values" → SELECT
+2. Select ">Dry Value" → SELECT
+   - Display shows: "Dry (air) ADC" / "12400 UP/DN SEL"
+   - Use UP/DOWN buttons to adjust (±1 per press)
+   - Press SELECT to save
+3. Select ">Wet Value" → SELECT
+   - Display shows: "Wet (water) ADC" / "6000 UP/DN SEL"
+   - Use UP/DOWN buttons to adjust (±1 per press)
+   - Press SELECT to save
+4. Press BACK to exit
 
 **Calibration values persist through power cycles** - you only need to do this once!
+
+**Viewing Calibration Values:**
+- Main Menu → System Info shows current dry/wet ADC values
+- Status screen always displays live raw ADC reading
 
 ### 3. Adjust Log Interval (Optional)
 
@@ -231,17 +268,20 @@ Default: 15 minutes (optimal for 14-day storage)
 
 **What you see:**
 ```
-Moisture: 75%
+M:75% ADC:7500
 Log:456/1344
 ```
 
-**Line 1:** Current soil moisture (0-100%)
+**Line 1:** Current moisture and raw sensor value
+- **M:XX%** - Calibrated soil moisture (0-100%)
+- **ADC:XXXXX** - Raw 14-bit ADC reading (0-16383)
 - Updates every 2 seconds when backlight is on
 - Shows "--%" before first calibration
 
 **Line 2:** Logged entries / total capacity
 - Example: "456/1344" = 456 readings stored, 1,344 max
 - When full, oldest entries are automatically overwritten (circular buffer)
+- **!** appears when buffer >90% full (warning to download data)
 
 ### Navigation Controls
 
@@ -261,26 +301,37 @@ Log:456/1344
 ### Menu Structure
 
 ```
-STATUS SCREEN (default view)
+STATUS SCREEN (default view: M:XX% ADC:XXXXX / Log:XXX/1344)
 │
 SELECT → MAIN MENU
-         ├── 1. Settings
-         │   └── Log Interval (1-60 min)
-         ├── 2. Calibrate Sensor
-         │   ├── Hold in AIR → Press SELECT
-         │   └── Put in WATER → Press SELECT
-         ├── 3. Download Data
-         │   ├── "Ready to download?" → SELECT to confirm
-         │   ├── Progress bar (0-100%)
-         │   └── "Download complete!"
-         ├── 4. Clear Data
-         │   └── "Clear all logs?" → SELECT to confirm
-         ├── 5. System Info
-         │   ├── "Entries: 456/1344"
-         │   ├── "Days: 4.8/14.0"
-         │   └── "Firmware: v1.0"
-         └── 6. Reset to Defaults
-             └── "Reset config?" → SELECT to confirm
+         ├── Settings
+         │   └── Log Interval
+         │       └── Adjust 1-60 min (UP/DOWN) → SELECT saves
+         │
+         ├── Calibrate
+         │   ├── Run Wizard
+         │   │   ├── Hold in AIR (live ADC display) → SELECT captures
+         │   │   ├── Wet soil/water (live ADC display) → SELECT captures
+         │   │   └── Saved! D:XXXXX W:XXXXX → SELECT exits
+         │   └── Edit Values
+         │       ├── Dry Value
+         │       │   └── 12400 UP/DN SEL (±1 increments)
+         │       └── Wet Value
+         │           └── 6000 UP/DN SEL (±1 increments)
+         │
+         ├── Download Data
+         │   ├── "Download CSV?" → SELECT=Yes
+         │   ├── Progress bar [####----] XX%
+         │   └── "Download done! XXX entries"
+         │
+         ├── Clear Data
+         │   └── "Clear all data?" → SELECT=Yes BCK=No
+         │
+         ├── System Info
+         │   └── Cal D:12400 / W:6000 Int:15m
+         │
+         └── Reset to Defaults
+             └── "Reset config?" → SELECT=Yes BCK=No
 ```
 
 ### Automatic Logging
@@ -451,9 +502,7 @@ Use insights to configure POC automatic watering system:
    - Example: Sensor updates in 8 minutes → Set `soakTime = 10 minutes`
 
 4. **Set Check Interval:** 2-3× natural dry-down period
-   - Example: Dries from 80% → 30% in 5 days → Set `checkInterval = 12 hours`
-
-**See POC `plant_watering_poc.ino` for automatic watering implementation.**
+   - Example: Dries from 80% → 30% in 5 days → Check moisture every 12 hours
 
 ### Example Analysis (Python)
 
@@ -496,8 +545,12 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 ### Sensor Issues
 
 **Problem:** Moisture reads 0% or 100% constantly
-- **Cause:** Sensor not calibrated
-- **Fix:** Main Menu → Calibrate Sensor → Follow wizard (air + water)
+- **Cause:** Sensor not calibrated or incorrect calibration values
+- **Fix:**
+  1. Check raw ADC value on status screen (should be 4,000-14,000 range)
+  2. Run calibration wizard: Main Menu → Calibrate → Run Wizard
+  3. Watch live ADC during calibration to ensure values stabilize
+  4. Verify calibration: Main Menu → System Info (check Dry/Wet values)
 
 **Problem:** Moisture fluctuates wildly (e.g., 20% → 80% → 30%)
 - **Cause:** Poor electrical contact or sensor corrosion
@@ -510,6 +563,22 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 **Problem:** Moisture doesn't change when watering plant
 - **Cause:** Sensor positioned in air pocket or outside water flow path
 - **Fix:** Reposition sensor closer to roots, ensure soil contact
+
+**Problem:** Calibration wizard shows unstable ADC values (constantly jumping)
+- **Cause:** Electrical noise, poor sensor contact, or failing sensor
+- **Fix:**
+  1. Check sensor wiring connections (especially D2 and A0)
+  2. Ensure sensor is not near electrical interference (motors, WiFi routers)
+  3. Try averaging: wait 5-10 seconds, watch for pattern in fluctuation
+  4. If sensor physically damaged, replace it
+
+**Problem:** Need to copy calibration values from another sensor
+- **Cause:** Want to replicate working calibration without physical access
+- **Fix:**
+  1. Note down working sensor's values from System Info
+  2. Main Menu → Calibrate → Edit Values
+  3. Manually enter Dry and Wet ADC values
+  4. Verify on status screen that moisture % looks reasonable
 
 ### EEPROM / Logging Issues
 
@@ -671,24 +740,31 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 
 ### After 2-Week Monitoring
 
-You now have quantitative data to configure automatic watering!
+You now have quantitative data about your plant's watering needs!
 
-**Recommended workflow:**
+**What to do with your data:**
 
 1. **Analyze CSV data** (see Data Analysis Workflow above)
-2. **Calculate optimal thresholds** from moisture trends
-3. **Assemble POC automatic watering variant:**
-   - Add 12V peristaltic pump + MOSFET circuit
-   - See `../poc/plant_watering_poc.ino`
-4. **Configure watering parameters** based on monitoring data:
-   - `minThreshold` (when to start watering)
-   - `targetHumidity` (when to stop watering)
-   - `soakTime` (moisture propagation delay)
-   - `checkInterval` (how often to check moisture)
-5. **Test automatic watering** in Monitor mode first (dry run)
-6. **Enable Watering mode** when confident in configuration
+   - Calculate natural dry-down rate
+   - Identify optimal moisture range for your plant
+   - Determine how long soil stays moist after watering
 
-**See `../poc/README.md` for POC automatic watering setup guide.**
+2. **Improve your watering routine:**
+   - Water when moisture drops to calculated threshold (e.g., 20%)
+   - Water until reaching optimal peak moisture (e.g., 75%)
+   - Adjust watering frequency based on observed dry-down patterns
+
+3. **Continue monitoring:**
+   - Download data periodically (every 2 weeks)
+   - Clear buffer and restart monitoring
+   - Compare seasonal changes in water consumption
+   - Track how different environmental conditions affect moisture
+
+4. **Use insights for decision-making:**
+   - Understand when plants need water while on vacation
+   - Detect if drainage is poor (moisture stays high too long)
+   - Identify if watering too frequently (moisture never drops)
+   - Optimize watering schedule for plant health
 
 ---
 
@@ -696,24 +772,9 @@ You now have quantitative data to configure automatic watering!
 
 - **Issues:** Report bugs at project repository
 - **Firmware version:** Check Main Menu → System Info
-- **Schematic:** See `soil_humidity_monitor.kicad_sch`
-- **BOM:** See `BOM_MONITOR.md`
-- **Project overview:** See `../../CLAUDE.md`
+- **Changelog:** See [`CHANGELOG.md`](CHANGELOG.md)
+- **Schematic:** See [`kicad/soil_humidity_monitor.kicad_sch`](kicad/soil_humidity_monitor.kicad_sch)
+- **BOM:** See [`BOM_MONITOR.md`](BOM_MONITOR.md)
+- **Project overview:** See [`../CLAUDE.md`](../CLAUDE.md)
 
-**Current firmware version:** v1.0 (stable)
-
----
-
-## Changelog
-
-### v1.0 (2024-12-31)
-- Initial release
-- 1,344-entry circular buffer
-- 15-minute default interval
-- CSV download via Serial
-- Sensor calibration wizard
-- Settings menu (log interval adjustment)
-- Backlight auto-sleep (1 minute)
-- System info screen
-- Clear data function
-- Reset to defaults function
+**Current firmware version:** v1.1 (stable)

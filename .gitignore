@@ -1,1 +1,17 @@
-monitor/monitor-backups/*
+# KiCad auto-generated files
+monitor/kicad/monitor-backups/
+monitor/kicad/fp-info-cache
+monitor/kicad/*.kicad_prl
+*.kicad_prl
+
+# Claude Code files
+.claude/
+CLAUDE.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/

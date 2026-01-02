@@ -1,14 +1,16 @@
 /*
  * Soil Humidity Monitor - Monitoring Variant
+ * Version: 1.1
  *
  * Hardware: Arduino UNO R4 WiFi
  * Display: 16x2 I2C LCD
  *
  * Features:
- * - Continuous soil moisture monitoring
+ * - Continuous soil moisture monitoring with live ADC display
  * - EEPROM circular buffer logging (14 days @ 15-min intervals)
  * - CSV data download via Serial (115200 baud)
- * - Sensor calibration wizard
+ * - Sensor calibration wizard with live ADC feedback
+ * - Manual calibration value editing
  * - User-adjustable log interval (1-60 minutes)
  * - GPIO-powered sensor (extends lifespan)
  * - No watering functionality (monitoring only)
@@ -29,6 +31,15 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <EEPROM.h>
+
+// ============================================================================
+// VERSION INFORMATION
+// ============================================================================
+
+#define VERSION_MAJOR       1
+#define VERSION_MINOR       1
+#define VERSION_STRING      "1.1"
+#define FIRMWARE_VERSION    ((VERSION_MAJOR << 8) | VERSION_MINOR)  // 0x0101
 
 // ============================================================================
 // PIN DEFINITIONS
@@ -72,7 +83,6 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define MAX_ENTRIES                 1344
 
 #define EEPROM_MAGIC_NUMBER         0xA5C3
-#define FIRMWARE_VERSION            0x0100  // v1.0
 
 // Entry flags
 #define FLAG_SENSOR_ERROR    0x10  // bit 4: Sensor error detected
@@ -130,6 +140,9 @@ enum MenuState {
     CAL_SENSOR_AIR,        // Read dry value
     CAL_SENSOR_WATER,      // Read wet value
     CAL_SENSOR_DONE,       // Calibration complete
+    EDIT_CAL_MENU,         // Edit calibration values submenu
+    EDIT_CAL_DRY,          // Edit dry value manually
+    EDIT_CAL_WET,          // Edit wet value manually
     DOWNLOAD_MENU,         // Download data menu
     DOWNLOAD_CONFIRM,      // Confirm download
     DOWNLOAD_PROGRESS,     // Downloading...
@@ -143,12 +156,14 @@ MenuState currentState = STATUS_SCREEN;
 uint8_t menuIndex = 0;           // Current menu selection
 uint8_t settingsIndex = 0;       // Settings menu item index
 uint8_t calibrateIndex = 0;      // Calibrate menu item index
+uint8_t editCalIndex = 0;        // Edit calibration menu item index
 
 // ============================================================================
 // GLOBAL VARIABLES
 // ============================================================================
 
 int currentMoisture = 0;         // Current moisture reading (%)
+int currentRawADC = 0;           // Current raw ADC value
 unsigned long lastLogTime = 0;   // Last data log timestamp
 unsigned long lastDisplayUpdate = 0; // Last display update timestamp
 bool backlightOn = true;         // LCD backlight state
@@ -173,7 +188,8 @@ unsigned long lastButtonPress = 0;
 void setup() {
     // Initialize serial for debugging and CSV download
     Serial.begin(115200);
-    Serial.println(F("Soil Humidity Monitor v1.0"));
+    Serial.print(F("Soil Humidity Monitor v"));
+    Serial.println(F(VERSION_STRING));
 
     // Initialize pins
     pinMode(SENSOR_POWER_PIN, OUTPUT);
@@ -192,7 +208,8 @@ void setup() {
     lcd.setCursor(0, 0);
     lcd.print(F("Soil Monitor"));
     lcd.setCursor(0, 1);
-    lcd.print(F("v1.0"));
+    lcd.print(F("v"));
+    lcd.print(F(VERSION_STRING));
     delay(2000);
 
     // Load configuration from EEPROM
@@ -222,6 +239,14 @@ void loop() {
         currentTime - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
         lastDisplayUpdate = currentTime;
         currentMoisture = readMoisture();
+        displayMenu();
+    }
+
+    // Update display during calibration to show live ADC values
+    if ((currentState == CAL_SENSOR_AIR || currentState == CAL_SENSOR_WATER) && backlightOn &&
+        currentTime - lastDisplayUpdate >= 500) {  // Update every 500ms for faster feedback
+        lastDisplayUpdate = currentTime;
+        currentRawADC = readMoistureRaw();
         displayMenu();
     }
 
@@ -255,6 +280,9 @@ int readMoisture() {
         delay(10);
     }
     int avgReading = sum / numSamples;
+
+    // Save raw ADC value for display
+    currentRawADC = avgReading;
 
     // Power off sensor
     digitalWrite(SENSOR_POWER_PIN, LOW);
@@ -416,7 +444,7 @@ void downloadDataToSerial() {
     // Send CSV header
     Serial.println(F("# Soil Humidity Monitor Data Export"));
     Serial.print(F("# Firmware Version: "));
-    Serial.println(F("1.0"));
+    Serial.println(F(VERSION_STRING));
     Serial.print(F("# Total Entries: "));
     Serial.println(entryCount);
     Serial.print(F("# Log Interval: "));
@@ -687,7 +715,22 @@ void handleUpButton() {
             break;
 
         case CALIBRATE_MENU:
-            calibrateIndex = (calibrateIndex > 0) ? calibrateIndex - 1 : 0;
+            calibrateIndex = (calibrateIndex > 0) ? calibrateIndex - 1 : 1;
+            displayMenu();
+            break;
+
+        case EDIT_CAL_MENU:
+            editCalIndex = (editCalIndex > 0) ? editCalIndex - 1 : 1;
+            displayMenu();
+            break;
+
+        case EDIT_CAL_DRY:
+            config.sensorDry = min(16383, config.sensorDry + 1);
+            displayMenu();
+            break;
+
+        case EDIT_CAL_WET:
+            config.sensorWet = min(16383, config.sensorWet + 1);
             displayMenu();
             break;
 
@@ -712,8 +755,22 @@ void handleDownButton() {
             break;
 
         case CALIBRATE_MENU:
-            // Only 1 item in Calibrate menu, keep at index 0
-            calibrateIndex = 0;
+            calibrateIndex = (calibrateIndex < 1) ? calibrateIndex + 1 : 0;
+            displayMenu();
+            break;
+
+        case EDIT_CAL_MENU:
+            editCalIndex = (editCalIndex < 1) ? editCalIndex + 1 : 0;
+            displayMenu();
+            break;
+
+        case EDIT_CAL_DRY:
+            config.sensorDry = max(0, config.sensorDry - 1);
+            displayMenu();
+            break;
+
+        case EDIT_CAL_WET:
+            config.sensorWet = max(0, config.sensorWet - 1);
             displayMenu();
             break;
 
@@ -782,22 +839,50 @@ void handleSelectButton() {
             if (calibrateIndex == 0) {
                 currentState = CAL_SENSOR_START;
                 displayMenu();
+            } else if (calibrateIndex == 1) {
+                currentState = EDIT_CAL_MENU;
+                editCalIndex = 0;
+                displayMenu();
             }
+            break;
+
+        case EDIT_CAL_MENU:
+            if (editCalIndex == 0) {
+                currentState = EDIT_CAL_DRY;
+                displayMenu();
+            } else if (editCalIndex == 1) {
+                currentState = EDIT_CAL_WET;
+                displayMenu();
+            }
+            break;
+
+        case EDIT_CAL_DRY:
+            saveConfig();
+            currentState = EDIT_CAL_MENU;
+            displayMenu();
+            break;
+
+        case EDIT_CAL_WET:
+            saveConfig();
+            currentState = EDIT_CAL_MENU;
+            displayMenu();
             break;
 
         case CAL_SENSOR_START:
             currentState = CAL_SENSOR_AIR;
+            currentRawADC = readMoistureRaw();  // Initial reading for display
             displayMenu();
             break;
 
         case CAL_SENSOR_AIR:
-            tempSensorDry = readMoistureRaw();
+            tempSensorDry = currentRawADC;  // Use the live value being displayed
             currentState = CAL_SENSOR_WATER;
+            currentRawADC = readMoistureRaw();  // Initial reading for next step
             displayMenu();
             break;
 
         case CAL_SENSOR_WATER:
-            tempSensorWet = readMoistureRaw();
+            tempSensorWet = currentRawADC;  // Use the live value being displayed
             config.sensorDry = tempSensorDry;
             config.sensorWet = tempSensorWet;
             saveConfig();
@@ -864,6 +949,17 @@ void handleBackButton() {
             currentState = CALIBRATE_MENU;
             displayMenu();
             break;
+
+        case EDIT_CAL_MENU:
+            currentState = CALIBRATE_MENU;
+            displayMenu();
+            break;
+
+        case EDIT_CAL_DRY:
+        case EDIT_CAL_WET:
+            currentState = EDIT_CAL_MENU;
+            displayMenu();
+            break;
     }
 }
 
@@ -877,9 +973,10 @@ void displayMenu() {
     switch (currentState) {
         case STATUS_SCREEN:
             lcd.setCursor(0, 0);
-            lcd.print(F("Moisture: "));
+            lcd.print(F("M:"));
             lcd.print(currentMoisture);
-            lcd.print(F("%"));
+            lcd.print(F("% ADC:"));
+            lcd.print(currentRawADC);
             lcd.setCursor(0, 1);
             lcd.print(F("Log:"));
             lcd.print(getEntryCount());
@@ -926,7 +1023,38 @@ void displayMenu() {
             lcd.setCursor(0, 0);
             lcd.print(F("CALIBRATE"));
             lcd.setCursor(0, 1);
-            lcd.print(F(">Sensor"));
+            if (calibrateIndex == 0) {
+                lcd.print(F(">Run Wizard"));
+            } else {
+                lcd.print(F(">Edit Values"));
+            }
+            break;
+
+        case EDIT_CAL_MENU:
+            lcd.setCursor(0, 0);
+            lcd.print(F("EDIT CAL VALUES"));
+            lcd.setCursor(0, 1);
+            if (editCalIndex == 0) {
+                lcd.print(F(">Dry Value"));
+            } else {
+                lcd.print(F(">Wet Value"));
+            }
+            break;
+
+        case EDIT_CAL_DRY:
+            lcd.setCursor(0, 0);
+            lcd.print(F("Dry (air) ADC"));
+            lcd.setCursor(0, 1);
+            lcd.print(config.sensorDry);
+            lcd.print(F(" UP/DN SEL"));
+            break;
+
+        case EDIT_CAL_WET:
+            lcd.setCursor(0, 0);
+            lcd.print(F("Wet (water) ADC"));
+            lcd.setCursor(0, 1);
+            lcd.print(config.sensorWet);
+            lcd.print(F(" UP/DN SEL"));
             break;
 
         case CAL_SENSOR_START:
@@ -940,14 +1068,18 @@ void displayMenu() {
             lcd.setCursor(0, 0);
             lcd.print(F("Hold in AIR"));
             lcd.setCursor(0, 1);
-            lcd.print(F("Press SELECT"));
+            lcd.print(F("ADC:"));
+            lcd.print(currentRawADC);
+            lcd.print(F(" SEL=OK"));
             break;
 
         case CAL_SENSOR_WATER:
             lcd.setCursor(0, 0);
             lcd.print(F("Wet soil/water"));
             lcd.setCursor(0, 1);
-            lcd.print(F("Press SELECT"));
+            lcd.print(F("ADC:"));
+            lcd.print(currentRawADC);
+            lcd.print(F(" SEL=OK"));
             break;
 
         case CAL_SENSOR_DONE:
@@ -986,12 +1118,14 @@ void displayMenu() {
 
         case SYSTEM_INFO:
             lcd.setCursor(0, 0);
-            lcd.print(F("FW: v1.0"));
+            lcd.print(F("Cal D:"));
+            lcd.print(config.sensorDry);
             lcd.setCursor(0, 1);
-            lcd.print(F("Space:"));
-            lcd.print(getEntryCount());
-            lcd.print(F("/"));
-            lcd.print(MAX_ENTRIES);
+            lcd.print(F("W:"));
+            lcd.print(config.sensorWet);
+            lcd.print(F(" Int:"));
+            lcd.print(config.logInterval);
+            lcd.print(F("m"));
             break;
 
         case RESET_CONFIRM:
