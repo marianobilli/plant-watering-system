@@ -49,7 +49,14 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 
 **Core items:**
 - Arduino UNO R4 WiFi
-- Capacitive soil moisture sensor
+- **Capacitive soil moisture sensor** (Cytron MAKER-SOIL-MOISTURE or compatible)
+  - **Manufacturer:** Cytron Technologies
+  - **Model:** MAKER-SOIL-MOISTURE
+  - **Datasheet:** [PDF](https://download.kamami.pl/p1178856-Dokumentacja_MAKER-SOIL-MOISTURE%20Datasheet.pdf)
+  - **Interface:** 4-wire Grove connector (VCC, GND, OUT, DIS)
+  - **Output voltage:** 1.0V - 5.2V (higher = drier soil)
+  - **Supply voltage:** 2.5V - 7.0V
+  - **Note:** Other capacitive sensors may work but require calibration
 - 16×2 I2C LCD display
 - 4× tactile push buttons
 - Breadboard + jumper wires
@@ -62,8 +69,9 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 | Component | Pin | Arduino Pin | Notes |
 |-----------|-----|-------------|-------|
 | **Soil Sensor** | VCC | D2 | GPIO power control (critical!) |
-| | AOUT | A0 | 14-bit ADC input |
+| | OUT | A0 | Analog output (14-bit ADC input) |
 | | GND | GND | Common ground |
+| | **DIS** | **GND** | **Disable pin - MUST connect to GND!** |
 | **16×2 LCD** | VCC | 5V | I2C module |
 | | GND | GND | |
 | | SDA | SDA (A4) | I2C data |
@@ -79,6 +87,50 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 | **USB Cable** | USB-C | Arduino USB port | Power + Serial data |
 
 **Complete schematic:** See [`kicad/soil_humidity_monitor.kicad_sch`](kicad/soil_humidity_monitor.kicad_sch)
+
+### CRITICAL: DIS Pin Wiring (Cytron MAKER-SOIL-MOISTURE)
+
+**The DIS (Disable) pin MUST be connected to GND for the sensor to work!**
+
+**What the DIS pin does:**
+- **DIS = LOW (connected to GND):** Sensor enabled, outputs valid voltage (1.0-5.2V)
+- **DIS = HIGH (floating or connected to VCC):** Sensor disabled, output invalid (~0.15V)
+
+**Why your sensor might read wrong values:**
+
+If you see ADC values around **500-600** (instead of 7,000-13,000), the DIS pin is likely:
+- Not connected (floating)
+- Accidentally connected to VCC
+- Connected to a GPIO pin that's outputting HIGH
+
+**Correct wiring:**
+```
+Sensor VCC → Arduino D2 (GPIO power)
+Sensor OUT → Arduino A0 (ADC input)
+Sensor GND → Arduino GND
+Sensor DIS → Arduino GND  ← CRITICAL!
+```
+
+**Why we connect DIS to GND (not a GPIO):**
+- Simple: No firmware changes needed
+- Reliable: Sensor always enabled when VCC is powered
+- Power savings still achieved: D2 GPIO controls VCC power
+
+**Advanced option (not recommended for beginners):**
+If you need even lower power consumption, you can control DIS from a GPIO pin:
+```
+Sensor DIS → Arduino D8
+```
+
+Then modify firmware to:
+1. Set D8 LOW before taking sensor readings
+2. Set D8 HIGH after readings complete
+
+**Power consumption comparison:**
+- **DIS = LOW:** 3.6mA active, sensor functional
+- **DIS = HIGH:** 0.14mA sleep, sensor disabled (output unusable)
+
+For this monitoring system, **always connect DIS to GND** - the power savings from GPIO control of VCC (D2) are already sufficient (0.02% duty cycle).
 
 ### Assembly Steps
 
@@ -101,7 +153,8 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 3. **Connect Sensor:**
    - D2 → Sensor VCC (GPIO-powered!)
    - GND → Sensor GND
-   - A0 → Sensor AOUT
+   - A0 → Sensor OUT (analog output)
+   - **GND → Sensor DIS (disable pin - MUST connect!)**
 
 4. **Connect Buttons:**
    - D4 → Button UP Pin 1, GND → Button UP Pin 2
@@ -182,55 +235,65 @@ Log:0/1344
 
 **Why?** Each sensor has different ADC values for dry/wet conditions. Calibration ensures accurate 0-100% readings.
 
-**Method 1: Calibration Wizard (Recommended)**
+**The new calibration menu allows you to calibrate dry and wet values independently**, with both automatic (measured) and manual (edited) options for each.
 
-1. **Enter Menu:**
-   - Press SELECT button (LCD backlight turns on)
-   - Display shows: "Main Menu" / ">Settings"
+**Method 1: Automatic Measurement (Recommended)**
 
-2. **Navigate to Calibrate:**
-   - Press DOWN button once
-   - Display shows: "Main Menu" / ">Calibrate"
-   - Press SELECT
-   - Display shows: "CALIBRATE" / ">Run Wizard"
-   - Press SELECT to start wizard
+Navigate to: Main Menu → Calibrate → Choose Dry or Wet → Measure Now
 
-3. **Dry Calibration:**
-   - Display shows: "Hold in AIR" / "ADC:XXXXX SEL=OK"
-   - Hold sensor in open air (not touching anything)
-   - **Watch ADC value update every 0.5 seconds** (live reading)
-   - Wait until value stabilizes (stops changing)
-   - Press SELECT to capture dry value
-   - Typical dry value: 12,000-14,000
+**For Dry Calibration:**
+1. Main Menu → Calibrate → ">Dry Value" → SELECT
+2. Select ">Measure Now" → SELECT
+3. Display shows: "Hold in AIR" / "ADC:XXXXX SEL=OK"
+4. Hold sensor in open air (not touching anything)
+5. **Watch ADC value update every 0.5 seconds** (live reading)
+6. Wait until value stabilizes (stops changing)
+7. Press SELECT to capture dry value
+8. Display shows: "Saved! D:XXXXX W:XXXXX" → Press SELECT
+9. Typical dry value: 10,000-13,000 (14-bit ADC)
 
-4. **Wet Calibration:**
-   - Display shows: "Wet soil/water" / "ADC:XXXXX SEL=OK"
-   - Submerge sensor probes in glass of water (don't submerge entire PCB!)
-   - **Watch ADC value update every 0.5 seconds** (live reading)
-   - Wait until value stabilizes (usually 2-3 seconds)
-   - Press SELECT to capture wet value
-   - Typical wet value: 4,000-8,000
-
-5. **Confirmation:**
-   - Display shows: "Saved! D:12400" / "W:6000 SEL=OK"
-   - Shows both calibrated values
-   - Press SELECT to return to Calibrate menu
-   - Press BACK twice to return to Status Screen
+**For Wet Calibration:**
+1. Main Menu → Calibrate → ">Wet Value" → SELECT
+2. Select ">Measure Now" → SELECT
+3. Display shows: "Wet soil/water" / "ADC:XXXXX SEL=OK"
+4. Submerge sensor probes in glass of water (don't submerge entire PCB!)
+5. **Watch ADC value update every 0.5 seconds** (live reading)
+6. Wait until value stabilizes (usually 2-3 seconds)
+7. Press SELECT to capture wet value
+8. Display shows: "Saved! D:XXXXX W:XXXXX" → Press SELECT
+9. Typical wet value: 7,500-9,000 (14-bit ADC)
 
 **Method 2: Manual Edit (Advanced)**
 
-If you know the correct ADC values or want to fine-tune calibration:
+Navigate to: Main Menu → Calibrate → Choose Dry or Wet → Edit Manually
 
-1. Main Menu → Calibrate → DOWN → "Edit Values" → SELECT
-2. Select ">Dry Value" → SELECT
-   - Display shows: "Dry (air) ADC" / "12400 UP/DN SEL"
-   - Use UP/DOWN buttons to adjust (±1 per press)
-   - Press SELECT to save
-3. Select ">Wet Value" → SELECT
-   - Display shows: "Wet (water) ADC" / "6000 UP/DN SEL"
-   - Use UP/DOWN buttons to adjust (±1 per press)
-   - Press SELECT to save
-4. Press BACK to exit
+**To edit dry value:**
+1. Main Menu → Calibrate → ">Dry Value" → SELECT
+2. Select ">Edit Manually" → SELECT
+3. Display shows: "Dry (air) ADC" / "12400 UP/DN SEL"
+4. Use UP/DOWN buttons to adjust (±50 per press)
+   - **Note:** Value automatically rounds to nearest multiple of 50
+   - Example: 11332 → rounds to 11350 → UP → 11400 → UP → 11450
+5. Press SELECT to save
+6. Display shows: "Saved! D:XXXXX W:XXXXX" → Press SELECT
+7. Returns to Calibrate menu
+
+**To edit wet value:**
+1. Main Menu → Calibrate → ">Wet Value" → SELECT
+2. Select ">Edit Manually" → SELECT
+3. Display shows: "Wet (water) ADC" / "6000 UP/DN SEL"
+4. Use UP/DOWN buttons to adjust (±50 per press)
+   - **Note:** Value automatically rounds to nearest multiple of 50
+   - Example: 9124 → rounds to 9100 → DOWN → 9050 → DOWN → 9000
+5. Press SELECT to save
+6. Display shows: "Saved! D:XXXXX W:XXXXX" → Press SELECT
+7. Returns to Calibrate menu
+
+**Benefits of independent calibration:**
+- Recalibrate only dry OR wet without redoing both
+- Test different dry calibration values without changing wet
+- Fine-tune one value while keeping the other
+- Faster workflow when you only need to adjust one value
 
 **Calibration values persist through power cycles** - you only need to do this once!
 
@@ -309,15 +372,16 @@ SELECT → MAIN MENU
          │       └── Adjust 1-60 min (UP/DOWN) → SELECT saves
          │
          ├── Calibrate
-         │   ├── Run Wizard
-         │   │   ├── Hold in AIR (live ADC display) → SELECT captures
-         │   │   ├── Wet soil/water (live ADC display) → SELECT captures
-         │   │   └── Saved! D:XXXXX W:XXXXX → SELECT exits
-         │   └── Edit Values
-         │       ├── Dry Value
-         │       │   └── 12400 UP/DN SEL (±1 increments)
-         │       └── Wet Value
-         │           └── 6000 UP/DN SEL (±1 increments)
+         │   ├── Dry Value
+         │   │   ├── Measure Now (automatic - hold sensor in air)
+         │   │   │   └── Hold in AIR (live ADC display) → SELECT captures → Saved!
+         │   │   └── Edit Manually (manual adjustment)
+         │   │       └── 12400 UP/DN SEL (±50 increments) → SELECT saves
+         │   └── Wet Value
+         │       ├── Measure Now (automatic - put sensor in water)
+         │       │   └── Wet soil/water (live ADC display) → SELECT captures → Saved!
+         │       └── Edit Manually (manual adjustment)
+         │           └── 6000 UP/DN SEL (±50 increments) → SELECT saves
          │
          ├── Download Data
          │   ├── "Download CSV?" → SELECT=Yes
@@ -545,12 +609,15 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 ### Sensor Issues
 
 **Problem:** Moisture reads 0% or 100% constantly
-- **Cause:** Sensor not calibrated or incorrect calibration values
+- **Cause:** Sensor not calibrated, incorrect calibration values, or **DIS pin not connected to GND**
 - **Fix:**
-  1. Check raw ADC value on status screen (should be 4,000-14,000 range)
-  2. Run calibration wizard: Main Menu → Calibrate → Run Wizard
-  3. Watch live ADC during calibration to ensure values stabilize
-  4. Verify calibration: Main Menu → System Info (check Dry/Wet values)
+  1. **FIRST: Check DIS pin connection!** If ADC reads 500-600, DIS pin is not connected to GND
+     - Verify DIS wire: Sensor DIS → Arduino GND
+     - After connecting DIS to GND, ADC should read 7,000-13,000
+  2. Check raw ADC value on status screen (should be 7,000-13,000 range for Cytron sensor)
+  3. Run calibration wizard: Main Menu → Calibrate → Run Wizard
+  4. Watch live ADC during calibration to ensure values stabilize
+  5. Verify calibration: Main Menu → System Info (check Dry/Wet values)
 
 **Problem:** Moisture fluctuates wildly (e.g., 20% → 80% → 30%)
 - **Cause:** Poor electrical contact or sensor corrosion
@@ -564,10 +631,24 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 - **Cause:** Sensor positioned in air pocket or outside water flow path
 - **Fix:** Reposition sensor closer to roots, ensure soil contact
 
+**Problem:** ADC values very low (500-600 instead of 7,000-13,000)
+- **Cause:** **DIS pin not connected to GND** - sensor is disabled!
+- **Symptoms:**
+  - Status screen shows ADC:500-600 (instead of 7,000-13,000)
+  - Moisture stuck at 100% even when sensor is in air
+  - Calibration gives values like Dry=560, Wet=541 (completely wrong)
+- **Fix:**
+  1. **Connect Sensor DIS pin to Arduino GND** (critical!)
+  2. Power cycle Arduino
+  3. Check status screen - ADC should now read 10,000-13,000 in air
+  4. Put sensor in water - ADC should drop to 7,000-9,000
+  5. Re-run calibration wizard with correct ADC values
+- **Why this happens:** The Cytron MAKER-SOIL-MOISTURE has a 4th wire (DIS) that must be pulled LOW to enable the sensor. If floating or HIGH, sensor outputs ~0.15V (invalid).
+
 **Problem:** Calibration wizard shows unstable ADC values (constantly jumping)
 - **Cause:** Electrical noise, poor sensor contact, or failing sensor
 - **Fix:**
-  1. Check sensor wiring connections (especially D2 and A0)
+  1. Check sensor wiring connections (especially D2, A0, and **DIS to GND**)
   2. Ensure sensor is not near electrical interference (motors, WiFi routers)
   3. Try averaging: wait 5-10 seconds, watch for pattern in fluctuation
   4. If sensor physically damaged, replace it
@@ -693,18 +774,53 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 
 **USB-powered:** No external power supply needed (unlike POC variant with pump).
 
-### Sensor Specifications
+### Sensor Specifications (Cytron MAKER-SOIL-MOISTURE)
 
-| Parameter | Typical Value | Range |
-|-----------|---------------|-------|
-| Dry ADC (air) | 12,400 | 10,000-14,000 |
-| Wet ADC (water) | 6,000 | 4,000-8,000 |
-| ADC Range | 14-bit | 0-16,383 |
+**Official Sensor Specs:**
+- **Model:** Cytron MAKER-SOIL-MOISTURE
+- **Datasheet:** [PDF](https://download.kamami.pl/p1178856-Dokumentacja_MAKER-SOIL-MOISTURE%20Datasheet.pdf)
+- **Op-Amp Chip:** MCP6002 (dual) or MCP6004 (quad) - both variants work identically
+- **Supply voltage:** 2.5V - 7.0V (5V nominal)
+- **Output voltage:** 1.0V - 5.2V (higher = drier soil)
+- **Current consumption:** 3.6mA @ 5V (active), 0.14mA (disabled via DIS pin)
+- **Interface:** 4-wire Grove (VCC, GND, OUT, DIS)
+- **Disable pin (DIS):** Active HIGH (pull LOW to enable sensor)
+
+**Expected ADC Readings (14-bit, 5V supply):**
+
+| Parameter | Voltage | ADC Value (14-bit) | Notes |
+|-----------|---------|-------------------|-------|
+| **Dry (air)** | 3.1-3.6V | 10,164-11,803 | Red LED on sensor |
+| **Moist (typical soil)** | 2.7-3.1V | 8,852-10,164 | Green LED on sensor |
+| **Wet (water)** | 2.3-2.7V | 7,540-8,852 | Blue LED on sensor |
+| **Minimum output** | 1.0V | 3,277 | Fully saturated |
+| **Maximum output** | 5.2V | 17,039 (clipped to 16,383) | Completely dry |
+
+**Typical calibration values:**
+- **Dry ADC (air):** 11,000-13,000
+- **Wet ADC (water):** 7,500-9,000
+- **Calibration range:** 3,000-6,000 ADC units
+
+**Operational Characteristics:**
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| ADC Resolution | 14-bit | 0-16,383 (Arduino UNO R4 WiFi) |
 | Warmup Time | 200 ms | Before reading |
-| Reading Time | 200 ms | 20 samples × 10ms |
-| Power-On Duration | 400 ms total | Per 15-min cycle |
+| Reading Time | 200 ms | 20 samples × 10ms averaged |
+| Power-On Duration | 400 ms total | Per 15-min logging cycle |
+| Duty Cycle | 0.02% | Extends sensor life 4-8× |
 | Lifespan (continuous) | 3-6 months | Without GPIO power control |
-| Lifespan (GPIO-powered) | 1-2 years | With 15-min duty cycle + waterproofing |
+| Lifespan (GPIO-powered) | 1-2 years | With waterproofing + duty cycling |
+
+**Common Issues:**
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| ADC reads 500-600 | DIS pin not connected to GND | Connect DIS → GND |
+| Moisture always 100% | ADC below wet calibration value | Check DIS pin, re-calibrate |
+| Moisture always 0% | ADC above dry calibration value | Re-calibrate sensor |
+| Unstable readings | Poor wiring or corrosion | Check connections, clean sensor |
 
 ---
 

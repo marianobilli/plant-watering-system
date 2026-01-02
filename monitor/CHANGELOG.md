@@ -10,21 +10,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - **Live calibration feedback:** ADC value now updates every 0.5 seconds during calibration wizard, allowing users to watch sensor stabilize before capturing values
-- **Manual calibration editing:** New "Edit Values" submenu under Calibrate menu for fine-tuning dry/wet ADC values without re-running full calibration wizard
+- **Independent dry/wet calibration:** Calibrate menu restructured to allow separate calibration of dry and wet values
+  - Each value (dry/wet) has its own submenu with "Measure Now" (automatic) and "Edit Manually" options
+  - Users can recalibrate just dry OR just wet without redoing both
+  - **New menu structure:** Calibrate → Dry Value/Wet Value → Measure Now/Edit Manually
 - **Raw ADC display:** Status screen now shows both moisture percentage and raw 14-bit ADC value (`M:XX% ADC:XXXXX`)
 - **Enhanced System Info:** System Info menu now displays current calibration values (Dry, Wet) and log interval setting
 - **Troubleshooting guidance:** Added documentation for unstable ADC readings and manual calibration value copying
 
 ### Changed
-- **Calibration UX improvement:** Calibration screens now show live ADC readings during air/water steps instead of static instructions
-- **Manual edit precision:** UP/DOWN buttons adjust calibration values by ±1 instead of ±50 for more precise fine-tuning
+- **Calibration UX improvement:** Calibration screens now show live ADC readings during measurement instead of static instructions
+- **Manual edit step size:** UP/DOWN buttons now adjust calibration values by ±50 with auto-rounding to nearest multiple of 50
+  - When entering manual edit mode, current value is automatically rounded to nearest 50
+  - Each UP/DOWN press adjusts by exactly 50 (e.g., 11350 → 11400 → 11450)
+  - Results in cleaner calibration values (11350 instead of 11332)
 - **Code organization:** Version information centralized to single constants (`VERSION_MAJOR`, `VERSION_MINOR`, `VERSION_STRING`)
-- **Menu structure:** Calibrate menu now has two options: "Run Wizard" (calibration wizard) and "Edit Values" (manual editing)
+- **Flexible calibration workflow:** No longer forced to calibrate both dry AND wet in sequence - calibrate only what you need
 - **Sensor reading stability:** Increased warmup delay from 200ms to 500ms and discard first 5 unstable samples before averaging
 
 ### Fixed
-- Calibration values now displayed immediately after calibration completes, showing both dry and wet values on confirmation screen
+- **Calibration confirmation:** Both measurement AND manual edit now show "Saved! D:XXXXX W:XXXXX" confirmation screen after saving
+  - Previously only measurement showed confirmation, manual edit returned directly to menu
+  - Provides consistent user feedback for all calibration methods
 - **Improved data accuracy:** Sensor readings now discard initial unstable samples after power-on, preventing inaccurate logged values during automatic logging cycles
+- **CRITICAL: ADC resolution configuration** - Added `analogReadResolution(14)` in setup() to enable 14-bit ADC mode (Arduino UNO R4 WiFi defaults to 10-bit for compatibility)
+  - **Symptom:** Users experienced calibration values 16× too low (e.g., Dry=560 instead of 12,400)
+  - **Fix:** Firmware now explicitly configures 14-bit mode; existing users must re-upload and re-calibrate
+- **Documentation:** Added Cytron MAKER-SOIL-MOISTURE sensor specifications and DIS pin wiring requirements to README.md
 
 ---
 

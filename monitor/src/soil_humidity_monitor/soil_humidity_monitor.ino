@@ -135,14 +135,14 @@ enum MenuState {
     MAIN_MENU,             // Menu selection
     SETTINGS_MENU,         // Settings submenu
     SETTING_LOG_INTERVAL,  // Adjust log interval
-    CALIBRATE_MENU,        // Calibration submenu
-    CAL_SENSOR_START,      // Sensor calibration start
-    CAL_SENSOR_AIR,        // Read dry value
-    CAL_SENSOR_WATER,      // Read wet value
-    CAL_SENSOR_DONE,       // Calibration complete
-    EDIT_CAL_MENU,         // Edit calibration values submenu
-    EDIT_CAL_DRY,          // Edit dry value manually
-    EDIT_CAL_WET,          // Edit wet value manually
+    CALIBRATE_MENU,        // Calibration submenu (Dry/Wet selection)
+    CAL_DRY_MENU,          // Dry value submenu (Measure/Edit)
+    CAL_WET_MENU,          // Wet value submenu (Measure/Edit)
+    CAL_DRY_MEASURE,       // Measure dry value (in air)
+    CAL_WET_MEASURE,       // Measure wet value (in water)
+    CAL_DRY_EDIT,          // Edit dry value manually
+    CAL_WET_EDIT,          // Edit wet value manually
+    CAL_MEASURE_DONE,      // Measurement complete (show result)
     DOWNLOAD_MENU,         // Download data menu
     DOWNLOAD_CONFIRM,      // Confirm download
     DOWNLOAD_PROGRESS,     // Downloading...
@@ -155,8 +155,9 @@ enum MenuState {
 MenuState currentState = STATUS_SCREEN;
 uint8_t menuIndex = 0;           // Current menu selection
 uint8_t settingsIndex = 0;       // Settings menu item index
-uint8_t calibrateIndex = 0;      // Calibrate menu item index
-uint8_t editCalIndex = 0;        // Edit calibration menu item index
+uint8_t calibrateIndex = 0;      // Calibrate menu item index (0=Dry, 1=Wet)
+uint8_t calDryIndex = 0;         // Dry calibration submenu index (0=Measure, 1=Edit)
+uint8_t calWetIndex = 0;         // Wet calibration submenu index (0=Measure, 1=Edit)
 
 // ============================================================================
 // GLOBAL VARIABLES
@@ -168,10 +169,6 @@ unsigned long lastLogTime = 0;   // Last data log timestamp
 unsigned long lastDisplayUpdate = 0; // Last display update timestamp
 bool backlightOn = true;         // LCD backlight state
 unsigned long lastActivity = 0;  // Last user activity timestamp
-
-// Calibration temporary variables
-uint16_t tempSensorDry = 0;
-uint16_t tempSensorWet = 0;
 
 // Button debouncing
 unsigned long lastButtonPress = 0;
@@ -190,6 +187,10 @@ void setup() {
     Serial.begin(115200);
     Serial.print(F("Soil Humidity Monitor v"));
     Serial.println(F(VERSION_STRING));
+
+    // Configure ADC for 14-bit resolution (0-16383)
+    // CRITICAL: Without this, Arduino defaults to 10-bit (0-1023) for compatibility
+    analogReadResolution(14);
 
     // Initialize pins
     pinMode(SENSOR_POWER_PIN, OUTPUT);
@@ -243,7 +244,7 @@ void loop() {
     }
 
     // Update display during calibration to show live ADC values
-    if ((currentState == CAL_SENSOR_AIR || currentState == CAL_SENSOR_WATER) && backlightOn &&
+    if ((currentState == CAL_DRY_MEASURE || currentState == CAL_WET_MEASURE) && backlightOn &&
         currentTime - lastDisplayUpdate >= 500) {  // Update every 500ms for faster feedback
         lastDisplayUpdate = currentTime;
         currentRawADC = readMoistureRaw();
@@ -738,18 +739,27 @@ void handleUpButton() {
             displayMenu();
             break;
 
-        case EDIT_CAL_MENU:
-            editCalIndex = (editCalIndex > 0) ? editCalIndex - 1 : 1;
+        case CAL_DRY_MENU:
+            calDryIndex = (calDryIndex > 0) ? calDryIndex - 1 : 1;
             displayMenu();
             break;
 
-        case EDIT_CAL_DRY:
-            config.sensorDry = min(16383, config.sensorDry + 1);
+        case CAL_WET_MENU:
+            calWetIndex = (calWetIndex > 0) ? calWetIndex - 1 : 1;
             displayMenu();
             break;
 
-        case EDIT_CAL_WET:
-            config.sensorWet = min(16383, config.sensorWet + 1);
+        case CAL_DRY_EDIT:
+            // Round to nearest 50, then add 50
+            config.sensorDry = ((config.sensorDry + 25) / 50) * 50 + 50;
+            config.sensorDry = min(16383, config.sensorDry);
+            displayMenu();
+            break;
+
+        case CAL_WET_EDIT:
+            // Round to nearest 50, then add 50
+            config.sensorWet = ((config.sensorWet + 25) / 50) * 50 + 50;
+            config.sensorWet = min(16383, config.sensorWet);
             displayMenu();
             break;
 
@@ -778,18 +788,27 @@ void handleDownButton() {
             displayMenu();
             break;
 
-        case EDIT_CAL_MENU:
-            editCalIndex = (editCalIndex < 1) ? editCalIndex + 1 : 0;
+        case CAL_DRY_MENU:
+            calDryIndex = (calDryIndex < 1) ? calDryIndex + 1 : 0;
             displayMenu();
             break;
 
-        case EDIT_CAL_DRY:
-            config.sensorDry = max(0, config.sensorDry - 1);
+        case CAL_WET_MENU:
+            calWetIndex = (calWetIndex < 1) ? calWetIndex + 1 : 0;
             displayMenu();
             break;
 
-        case EDIT_CAL_WET:
-            config.sensorWet = max(0, config.sensorWet - 1);
+        case CAL_DRY_EDIT:
+            // Round to nearest 50, then subtract 50
+            config.sensorDry = ((config.sensorDry + 25) / 50) * 50 - 50;
+            config.sensorDry = max(0, config.sensorDry);
+            displayMenu();
+            break;
+
+        case CAL_WET_EDIT:
+            // Round to nearest 50, then subtract 50
+            config.sensorWet = ((config.sensorWet + 25) / 50) * 50 - 50;
+            config.sensorWet = max(0, config.sensorWet);
             displayMenu();
             break;
 
@@ -856,60 +875,75 @@ void handleSelectButton() {
 
         case CALIBRATE_MENU:
             if (calibrateIndex == 0) {
-                currentState = CAL_SENSOR_START;
+                // Selected "Dry Value"
+                currentState = CAL_DRY_MENU;
+                calDryIndex = 0;
                 displayMenu();
             } else if (calibrateIndex == 1) {
-                currentState = EDIT_CAL_MENU;
-                editCalIndex = 0;
+                // Selected "Wet Value"
+                currentState = CAL_WET_MENU;
+                calWetIndex = 0;
                 displayMenu();
             }
             break;
 
-        case EDIT_CAL_MENU:
-            if (editCalIndex == 0) {
-                currentState = EDIT_CAL_DRY;
+        case CAL_DRY_MENU:
+            if (calDryIndex == 0) {
+                // Selected "Measure Now" for dry
+                currentState = CAL_DRY_MEASURE;
+                currentRawADC = readMoistureRaw();  // Initial reading for display
                 displayMenu();
-            } else if (editCalIndex == 1) {
-                currentState = EDIT_CAL_WET;
+            } else if (calDryIndex == 1) {
+                // Selected "Edit Manually" for dry - round to nearest 50
+                config.sensorDry = ((config.sensorDry + 25) / 50) * 50;
+                currentState = CAL_DRY_EDIT;
                 displayMenu();
             }
             break;
 
-        case EDIT_CAL_DRY:
+        case CAL_WET_MENU:
+            if (calWetIndex == 0) {
+                // Selected "Measure Now" for wet
+                currentState = CAL_WET_MEASURE;
+                currentRawADC = readMoistureRaw();  // Initial reading for display
+                displayMenu();
+            } else if (calWetIndex == 1) {
+                // Selected "Edit Manually" for wet - round to nearest 50
+                config.sensorWet = ((config.sensorWet + 25) / 50) * 50;
+                currentState = CAL_WET_EDIT;
+                displayMenu();
+            }
+            break;
+
+        case CAL_DRY_MEASURE:
+            // User pressed SELECT to capture the dry value
+            config.sensorDry = currentRawADC;  // Use the live value being displayed
             saveConfig();
-            currentState = EDIT_CAL_MENU;
+            currentState = CAL_MEASURE_DONE;
             displayMenu();
             break;
 
-        case EDIT_CAL_WET:
+        case CAL_WET_MEASURE:
+            // User pressed SELECT to capture the wet value
+            config.sensorWet = currentRawADC;  // Use the live value being displayed
             saveConfig();
-            currentState = EDIT_CAL_MENU;
+            currentState = CAL_MEASURE_DONE;
             displayMenu();
             break;
 
-        case CAL_SENSOR_START:
-            currentState = CAL_SENSOR_AIR;
-            currentRawADC = readMoistureRaw();  // Initial reading for display
-            displayMenu();
-            break;
-
-        case CAL_SENSOR_AIR:
-            tempSensorDry = currentRawADC;  // Use the live value being displayed
-            currentState = CAL_SENSOR_WATER;
-            currentRawADC = readMoistureRaw();  // Initial reading for next step
-            displayMenu();
-            break;
-
-        case CAL_SENSOR_WATER:
-            tempSensorWet = currentRawADC;  // Use the live value being displayed
-            config.sensorDry = tempSensorDry;
-            config.sensorWet = tempSensorWet;
+        case CAL_DRY_EDIT:
             saveConfig();
-            currentState = CAL_SENSOR_DONE;
+            currentState = CAL_MEASURE_DONE;
             displayMenu();
             break;
 
-        case CAL_SENSOR_DONE:
+        case CAL_WET_EDIT:
+            saveConfig();
+            currentState = CAL_MEASURE_DONE;
+            displayMenu();
+            break;
+
+        case CAL_MEASURE_DONE:
             currentState = CALIBRATE_MENU;
             displayMenu();
             break;
@@ -961,22 +995,26 @@ void handleBackButton() {
             displayMenu();
             break;
 
-        case CAL_SENSOR_START:
-        case CAL_SENSOR_AIR:
-        case CAL_SENSOR_WATER:
-        case CAL_SENSOR_DONE:
+        case CAL_DRY_MENU:
+        case CAL_WET_MENU:
             currentState = CALIBRATE_MENU;
             displayMenu();
             break;
 
-        case EDIT_CAL_MENU:
-            currentState = CALIBRATE_MENU;
+        case CAL_DRY_MEASURE:
+        case CAL_DRY_EDIT:
+            currentState = CAL_DRY_MENU;
             displayMenu();
             break;
 
-        case EDIT_CAL_DRY:
-        case EDIT_CAL_WET:
-            currentState = EDIT_CAL_MENU;
+        case CAL_WET_MEASURE:
+        case CAL_WET_EDIT:
+            currentState = CAL_WET_MENU;
+            displayMenu();
+            break;
+
+        case CAL_MEASURE_DONE:
+            currentState = CALIBRATE_MENU;
             displayMenu();
             break;
     }
@@ -1043,47 +1081,35 @@ void displayMenu() {
             lcd.print(F("CALIBRATE"));
             lcd.setCursor(0, 1);
             if (calibrateIndex == 0) {
-                lcd.print(F(">Run Wizard"));
-            } else {
-                lcd.print(F(">Edit Values"));
-            }
-            break;
-
-        case EDIT_CAL_MENU:
-            lcd.setCursor(0, 0);
-            lcd.print(F("EDIT CAL VALUES"));
-            lcd.setCursor(0, 1);
-            if (editCalIndex == 0) {
                 lcd.print(F(">Dry Value"));
             } else {
                 lcd.print(F(">Wet Value"));
             }
             break;
 
-        case EDIT_CAL_DRY:
+        case CAL_DRY_MENU:
             lcd.setCursor(0, 0);
-            lcd.print(F("Dry (air) ADC"));
+            lcd.print(F("DRY CALIBRATION"));
             lcd.setCursor(0, 1);
-            lcd.print(config.sensorDry);
-            lcd.print(F(" UP/DN SEL"));
+            if (calDryIndex == 0) {
+                lcd.print(F(">Measure Now"));
+            } else {
+                lcd.print(F(">Edit Manually"));
+            }
             break;
 
-        case EDIT_CAL_WET:
+        case CAL_WET_MENU:
             lcd.setCursor(0, 0);
-            lcd.print(F("Wet (water) ADC"));
+            lcd.print(F("WET CALIBRATION"));
             lcd.setCursor(0, 1);
-            lcd.print(config.sensorWet);
-            lcd.print(F(" UP/DN SEL"));
+            if (calWetIndex == 0) {
+                lcd.print(F(">Measure Now"));
+            } else {
+                lcd.print(F(">Edit Manually"));
+            }
             break;
 
-        case CAL_SENSOR_START:
-            lcd.setCursor(0, 0);
-            lcd.print(F("Sensor Cal"));
-            lcd.setCursor(0, 1);
-            lcd.print(F("Press SELECT"));
-            break;
-
-        case CAL_SENSOR_AIR:
+        case CAL_DRY_MEASURE:
             lcd.setCursor(0, 0);
             lcd.print(F("Hold in AIR"));
             lcd.setCursor(0, 1);
@@ -1092,7 +1118,7 @@ void displayMenu() {
             lcd.print(F(" SEL=OK"));
             break;
 
-        case CAL_SENSOR_WATER:
+        case CAL_WET_MEASURE:
             lcd.setCursor(0, 0);
             lcd.print(F("Wet soil/water"));
             lcd.setCursor(0, 1);
@@ -1101,7 +1127,23 @@ void displayMenu() {
             lcd.print(F(" SEL=OK"));
             break;
 
-        case CAL_SENSOR_DONE:
+        case CAL_DRY_EDIT:
+            lcd.setCursor(0, 0);
+            lcd.print(F("Dry (air) ADC"));
+            lcd.setCursor(0, 1);
+            lcd.print(config.sensorDry);
+            lcd.print(F(" UP/DN SEL"));
+            break;
+
+        case CAL_WET_EDIT:
+            lcd.setCursor(0, 0);
+            lcd.print(F("Wet (water) ADC"));
+            lcd.setCursor(0, 1);
+            lcd.print(config.sensorWet);
+            lcd.print(F(" UP/DN SEL"));
+            break;
+
+        case CAL_MEASURE_DONE:
             lcd.setCursor(0, 0);
             lcd.print(F("Saved! D:"));
             lcd.print(config.sensorDry);
