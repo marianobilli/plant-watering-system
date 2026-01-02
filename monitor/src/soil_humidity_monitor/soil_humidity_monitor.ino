@@ -270,11 +270,20 @@ void loop() {
 int readMoisture() {
     // Power on sensor from GPIO (extends sensor life dramatically)
     digitalWrite(SENSOR_POWER_PIN, HIGH);
-    delay(200); // Warmup time for stable reading
+    delay(500); // Increased warmup time for stable reading (was 200ms)
 
-    // Average 20 samples to reduce noise (Arduino UNO R4 has 14-bit ADC)
+    // Discard first few unstable samples, then average
+    const int discardSamples = 5;   // Throw away first 5 readings
+    const int numSamples = 20;      // Average next 20 readings
+
+    // Discard initial unstable readings
+    for (int i = 0; i < discardSamples; i++) {
+        analogRead(SENSOR_ADC_PIN);
+        delay(10);
+    }
+
+    // Average stable samples to reduce noise (Arduino UNO R4 has 14-bit ADC)
     long sum = 0;
-    const int numSamples = 20;
     for (int i = 0; i < numSamples; i++) {
         sum += analogRead(SENSOR_ADC_PIN);
         delay(10);
@@ -302,12 +311,22 @@ int readMoisture() {
 }
 
 int readMoistureRaw() {
-    // Read raw ADC value (for calibration)
+    // Read raw ADC value (for calibration and logging)
     digitalWrite(SENSOR_POWER_PIN, HIGH);
-    delay(200);
+    delay(500); // Increased warmup time for stable reading (was 200ms)
 
+    // Discard first few unstable samples, then average
+    const int discardSamples = 5;   // Throw away first 5 readings
+    const int numSamples = 20;      // Average next 20 readings
+
+    // Discard initial unstable readings
+    for (int i = 0; i < discardSamples; i++) {
+        analogRead(SENSOR_ADC_PIN);
+        delay(10);
+    }
+
+    // Average stable samples
     long sum = 0;
-    const int numSamples = 20;
     for (int i = 0; i < numSamples; i++) {
         sum += analogRead(SENSOR_ADC_PIN);
         delay(10);

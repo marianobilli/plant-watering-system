@@ -20,9 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Manual edit precision:** UP/DOWN buttons adjust calibration values by ±1 instead of ±50 for more precise fine-tuning
 - **Code organization:** Version information centralized to single constants (`VERSION_MAJOR`, `VERSION_MINOR`, `VERSION_STRING`)
 - **Menu structure:** Calibrate menu now has two options: "Run Wizard" (calibration wizard) and "Edit Values" (manual editing)
+- **Sensor reading stability:** Increased warmup delay from 200ms to 500ms and discard first 5 unstable samples before averaging
 
 ### Fixed
 - Calibration values now displayed immediately after calibration completes, showing both dry and wet values on confirmation screen
+- **Improved data accuracy:** Sensor readings now discard initial unstable samples after power-on, preventing inaccurate logged values during automatic logging cycles
 
 ---
 
