@@ -11,7 +11,7 @@ This is a subset of the POC system - removed pump, MOSFET circuit, SD card, and 
 | Item | Quantity | Specification | Purpose | Est. Price (USD) |
 |------|----------|---------------|---------|------------------|
 | **Arduino UNO R4 WiFi** | 1 | Renesas RA4M1, 14-bit ADC, 8KB EEPROM, 5V logic | Main controller + EEPROM storage | $27.50 |
-| **Capacitive Soil Moisture Sensor** | 1 | Cytron or equivalent, analog output, corrosion-resistant | Measures soil moisture (0-100%) | $3.00 |
+| **Capacitive Soil Moisture Sensor** | 1 | **Must have DIS pin** (Cytron MAKER-SOIL-MOISTURE or equivalent), analog output | Measures soil moisture (0-100%) | $3.00 |
 | **16×2 I2C LCD Display** | 1 | PCF8574 I2C backpack, 0x27 or 0x3F address, 5V | Shows moisture + menu + entry count | $3.50 |
 | **Tactile Push Buttons** | 4 | 6mm momentary, 4-pin, breadboard-compatible | Menu navigation (UP/DOWN/SELECT/BACK) | $0.50 |
 | **Breadboard** | 1 | 830-point half-size or full-size | Prototyping platform | $3.00 |
@@ -46,18 +46,23 @@ This is a subset of the POC system - removed pump, MOSFET circuit, SD card, and 
 - **Part Number:** ABX00087
 
 ### Capacitive Soil Moisture Sensor
-- **Recommended:** Cytron Soil Moisture Sensor (SKU: SEN-MOIST)
+- **Recommended:** Cytron MAKER-SOIL-MOISTURE (SKU: SEN-MOIST)
 - **Why Capacitive:** Corrosion-resistant (vs resistive sensors that fail in weeks)
+- **CRITICAL REQUIREMENT (v1.4+):** Must have 4-pin interface with **DIS (disable) pin**
+  - 3-pin sensors (VCC/GND/OUT only) are **NOT compatible** with v1.4 firmware
+  - DIS pin used for GPIO-controlled power management (extends sensor life 4-8×)
 - **Specifications:**
+  - 4-pin interface: VCC, GND, OUT, **DIS**
   - Analog output (0-3.3V or 0-5V depending on VCC)
-  - Operating voltage: 3.3V-5V
+  - Operating voltage: 3.3V-5V (recommended 5V for full ADC range)
   - Typical dry value: ~12400 (14-bit ADC)
   - Typical wet value: ~6000 (14-bit ADC)
+  - DIS pin: HIGH = disabled (0.14mA sleep), LOW = enabled (3.6mA active)
 - **CRITICAL:** Waterproof with clear nail polish before use!
 - **Where to Buy:**
-  - Cytron official store
-  - AliExpress, eBay (search "v1.2 capacitive soil moisture")
-  - Amazon (verify capacitive, not resistive)
+  - Cytron official store (confirmed DIS pin support)
+  - AliExpress, eBay (search "v1.2 capacitive soil moisture 4-pin DIS")
+  - Amazon (verify 4-pin interface with DIS pin, not 3-pin)
 
 ### 16×2 I2C LCD Display
 - **Specifications:**
@@ -112,7 +117,7 @@ This is a subset of the POC system - removed pump, MOSFET circuit, SD card, and 
 
 ```
 1× Arduino UNO R4 WiFi (ABX00087)
-1× Capacitive Soil Moisture Sensor (v1.2 or Cytron)
+1× Capacitive Soil Moisture Sensor (4-pin with DIS, Cytron MAKER-SOIL-MOISTURE)
 1× 16×2 I2C LCD Display (blue backlight, PCF8574)
 4× 6mm Tactile Push Buttons (momentary, 4-pin)
 1× 830-point Breadboard
@@ -126,7 +131,7 @@ This is a subset of the POC system - removed pump, MOSFET circuit, SD card, and 
 ## Purchasing Tips
 
 1. **Arduino Authenticity:** Buy from authorized distributors to avoid clones with fake chips
-2. **Sensor Version:** Verify it's **capacitive** (v1.2), not resistive (v1.0)
+2. **Sensor Version:** Verify it has **4-pin interface with DIS pin** - 3-pin sensors NOT compatible with v1.4+
 3. **LCD I2C:** Ensure I2C backpack is **pre-soldered** (saves you soldering work)
 4. **USB Cable:** Must support **data transfer**, not just charging (verify "data cable")
 5. **Buttons:** Buy extra (10-20 pack) - they're cheap and useful for future projects
@@ -181,7 +186,7 @@ Alternative configurations:
 | LCD | 5-10 years | Backlight may dim over time |
 | Buttons | 100K+ presses | Mechanical wear, easily replaceable |
 | Sensor (waterproofed) | 1-2 years | Electrolysis if constantly powered |
-| Sensor (GPIO-powered) | 2-4 years | Extended by 15-min duty cycle |
+| Sensor (DIS-controlled) | 2-4 years | Extended by 15-min duty cycle (v1.4+) |
 | USB Cable | 3-5 years | Connector wear from plugging/unplugging |
 
 **No recurring costs** (no pump consumables, no power supply replacement)

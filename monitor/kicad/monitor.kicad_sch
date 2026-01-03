@@ -1455,20 +1455,22 @@
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
-			(property "Reference" "U"
-				(at -7.62 6.35 0)
+			(property "Reference" "U1"
+				(at 7.62 -15.2399 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
+					(justify left)
 				)
 			)
 			(property "Value" "SensorSoilMoisture"
-				(at 0 3.81 0)
+				(at 7.62 -17.7799 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
+					(justify left)
 				)
 			)
 			(property "Footprint" ""
@@ -1525,7 +1527,7 @@
 			)
 			(symbol "SensorSoilMoisture_1_1"
 				(pin power_in line
-					(at -2.54 1.27 270)
+					(at -3.81 1.27 270)
 					(length 5.08)
 					(name "GND"
 						(effects
@@ -1543,7 +1545,7 @@
 					)
 				)
 				(pin power_in line
-					(at 0 1.27 270)
+					(at -1.27 1.27 270)
 					(length 5.08)
 					(name "VCC"
 						(effects
@@ -1560,8 +1562,26 @@
 						)
 					)
 				)
+				(pin input line
+					(at 1.27 1.27 270)
+					(length 5.08)
+					(name "DIS"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
 				(pin output line
-					(at 2.54 1.27 270)
+					(at 3.81 1.27 270)
 					(length 5.08)
 					(name "OUT"
 						(effects
@@ -1570,7 +1590,7 @@
 							)
 						)
 					)
-					(number "3"
+					(number "4"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2026,6 +2046,16 @@
 	)
 	(wire
 		(pts
+			(xy 215.9 58.42) (xy 215.9 82.55)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0f560e3a-a56f-42e4-8e75-217960b8db07")
+	)
+	(wire
+		(pts
 			(xy 180.34 80.01) (xy 176.53 80.01)
 		)
 		(stroke
@@ -2033,6 +2063,16 @@
 			(type default)
 		)
 		(uuid "1216e0ec-8dd2-44c2-8786-11300dc24802")
+	)
+	(wire
+		(pts
+			(xy 218.44 74.93) (xy 218.44 82.55)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "48f39f96-e668-4c9b-b7a3-381232dd77a5")
 	)
 	(wire
 		(pts
@@ -2063,6 +2103,16 @@
 			(type default)
 		)
 		(uuid "59caf9f2-8ec3-40a3-afae-7c8c891299d8")
+	)
+	(wire
+		(pts
+			(xy 167.64 58.42) (xy 215.9 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "64ef87bf-4d3f-4ec0-84b6-1d68a06f57e7")
 	)
 	(wire
 		(pts
@@ -2116,7 +2166,7 @@
 	)
 	(wire
 		(pts
-			(xy 217.17 82.55) (xy 242.57 82.55)
+			(xy 218.44 74.93) (xy 241.3 74.93)
 		)
 		(stroke
 			(width 0)
@@ -2146,7 +2196,7 @@
 	)
 	(wire
 		(pts
-			(xy 242.57 82.55) (xy 242.57 134.62)
+			(xy 241.3 74.93) (xy 241.3 134.62)
 		)
 		(stroke
 			(width 0)
@@ -2166,7 +2216,7 @@
 	)
 	(wire
 		(pts
-			(xy 242.57 134.62) (xy 107.95 134.62)
+			(xy 241.3 134.62) (xy 107.95 134.62)
 		)
 		(stroke
 			(width 0)
@@ -2206,16 +2256,6 @@
 	)
 	(wire
 		(pts
-			(xy 214.63 58.42) (xy 214.63 82.55)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "be704730-1d0c-4f16-b299-f99bc8f2e99b")
-	)
-	(wire
-		(pts
 			(xy 177.8 69.85) (xy 177.8 63.5)
 		)
 		(stroke
@@ -2246,13 +2286,13 @@
 	)
 	(wire
 		(pts
-			(xy 167.64 58.42) (xy 214.63 58.42)
+			(xy 213.36 77.47) (xy 213.36 82.55)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "c8e7886f-a0e2-43d2-ad31-c373cc54abbf")
+		(uuid "c9cfa99d-2ee4-47d9-8ef3-2e46f2b9afcf")
 	)
 	(wire
 		(pts
@@ -2336,7 +2376,7 @@
 	)
 	(wire
 		(pts
-			(xy 212.09 82.55) (xy 201.93 82.55)
+			(xy 210.82 82.55) (xy 201.93 82.55)
 		)
 		(stroke
 			(width 0)
@@ -2983,6 +3023,9 @@
 		(pin "1"
 			(uuid "28c99863-b61b-44f3-b5e6-cec6be39f4cf")
 		)
+		(pin "4"
+			(uuid "4260eee5-39a7-4aa4-8e01-abe1d527adc2")
+		)
 		(instances
 			(project ""
 				(path "/808532ee-7c15-424a-9c20-bb44fb0ddf6e"
@@ -3324,6 +3367,72 @@
 			(project "monitor"
 				(path "/808532ee-7c15-424a-9c20-bb44fb0ddf6e"
 					(reference "SW3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+5V")
+		(at 213.36 77.47 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "fa74d529-a0a5-4007-b01e-aba19e48beed")
+		(property "Reference" "#PWR06"
+			(at 213.36 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 213.36 72.39 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 213.36 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 213.36 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 213.36 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "872f4dca-a221-4e01-b531-1444e8c2e3e9")
+		)
+		(instances
+			(project "monitor"
+				(path "/808532ee-7c15-424a-9c20-bb44fb0ddf6e"
+					(reference "#PWR06")
 					(unit 1)
 				)
 			)

@@ -1,8 +1,8 @@
 # Soil Humidity Monitor - User Guide
 
-**2-Week EEPROM Data Logger for Plant Moisture Analysis**
+**1-Week EEPROM Data Logger for Plant Moisture Analysis**
 
-A simplified monitoring-only variant designed to help you understand your plant's natural watering cycles before implementing automatic irrigation. Logs 1,344 measurements over 14 days to Arduino UNO R4 WiFi's 8KB EEPROM.
+A simplified monitoring-only variant designed to help you understand your plant's natural watering cycles before implementing automatic irrigation. Logs 672 measurements over 7 days to Arduino UNO R4 WiFi's 8KB EEPROM (v1.2 includes min/max ADC tracking).
 
 ---
 
@@ -18,13 +18,14 @@ A simplified monitoring-only variant designed to help you understand your plant'
 
 **After 2 weeks:** Download CSV via Serial Monitor (115200 baud) → Analyze in Excel/Python
 
-### Key Features (v1.1)
+### Key Features (v1.2)
 
 - **Real-time ADC monitoring:** Status screen shows both moisture % and raw sensor value
+- **Configurable sensor parameters:** Warmup time, number of samples, measurement delays
+- **Min/Max ADC tracking:** CSV export includes min/max ADC values for each measurement
 - **Live calibration feedback:** Watch ADC values stabilize during calibration (updates every 0.5s)
 - **Manual calibration editing:** Fine-tune dry/wet values without re-running calibration wizard
-- **Enhanced diagnostics:** System Info displays calibration values and current settings
-- **Improved UX:** Better visual feedback and more control over sensor configuration
+- **Expanded settings menu:** 5 configurable parameters (log interval, LCD sleep, sensor timing)
 
 ---
 
@@ -68,10 +69,10 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 
 | Component | Pin | Arduino Pin | Notes |
 |-----------|-----|-------------|-------|
-| **Soil Sensor** | VCC | D2 | GPIO power control (critical!) |
+| **Soil Sensor** | VCC | 5V | Constant power (always on) |
+| | DIS | D2 | Disable control (LOW=enabled, HIGH=disabled) |
 | | OUT | A0 | Analog output (14-bit ADC input) |
 | | GND | GND | Common ground |
-| | **DIS** | **GND** | **Disable pin - MUST connect to GND!** |
 | **16×2 LCD** | VCC | 5V | I2C module |
 | | GND | GND | |
 | | SDA | SDA (A4) | I2C data |
@@ -88,49 +89,40 @@ See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
 
 **Complete schematic:** See [`kicad/soil_humidity_monitor.kicad_sch`](kicad/soil_humidity_monitor.kicad_sch)
 
-### CRITICAL: DIS Pin Wiring (Cytron MAKER-SOIL-MOISTURE)
+### DIS Pin Control via GPIO
 
-**The DIS (Disable) pin MUST be connected to GND for the sensor to work!**
+**The DIS pin is now controlled by D2 for power management!**
 
-**What the DIS pin does:**
-- **DIS = LOW (connected to GND):** Sensor enabled, outputs valid voltage (1.0-5.2V)
-- **DIS = HIGH (floating or connected to VCC):** Sensor disabled, output invalid (~0.15V)
+**How DIS pin control works:**
+- **D2 = LOW (DIS pin LOW):** Sensor enabled, outputs valid voltage (1.0-5.2V)
+- **D2 = HIGH (DIS pin HIGH):** Sensor disabled, output invalid (~0.15V), low power (0.14mA)
 
-**Why your sensor might read wrong values:**
-
-If you see ADC values around **500-600** (instead of 7,000-13,000), the DIS pin is likely:
-- Not connected (floating)
-- Accidentally connected to VCC
-- Connected to a GPIO pin that's outputting HIGH
-
-**Correct wiring:**
+**Wiring:**
 ```
-Sensor VCC → Arduino D2 (GPIO power)
+Sensor VCC → Arduino 5V (constant power)
 Sensor OUT → Arduino A0 (ADC input)
 Sensor GND → Arduino GND
-Sensor DIS → Arduino GND  ← CRITICAL!
+Sensor DIS → Arduino D2 (GPIO control)
 ```
 
-**Why we connect DIS to GND (not a GPIO):**
-- Simple: No firmware changes needed
-- Reliable: Sensor always enabled when VCC is powered
-- Power savings still achieved: D2 GPIO controls VCC power
+**Benefits of DIS pin control:**
+- Faster wake-up time (VCC already stable, no capacitor charging)
+- Sensor retains internal state (more consistent readings)
+- Same longevity benefits as GPIO power cycling (0.02% duty cycle)
+- Lower power consumption in sleep (0.14mA vs 0mA, negligible difference)
 
-**Advanced option (not recommended for beginners):**
-If you need even lower power consumption, you can control DIS from a GPIO pin:
-```
-Sensor DIS → Arduino D8
-```
+**Troubleshooting:**
 
-Then modify firmware to:
-1. Set D8 LOW before taking sensor readings
-2. Set D8 HIGH after readings complete
+If you see ADC values around **500-600** (instead of 7,000-13,000), the DIS pin may be:
+- Not connected to D2
+- Connected incorrectly (check wiring)
+- D2 pin stuck HIGH (check Arduino functionality)
 
-**Power consumption comparison:**
-- **DIS = LOW:** 3.6mA active, sensor functional
-- **DIS = HIGH:** 0.14mA sleep, sensor disabled (output unusable)
-
-For this monitoring system, **always connect DIS to GND** - the power savings from GPIO control of VCC (D2) are already sufficient (0.02% duty cycle).
+**Correct wiring checklist:**
+- [ ] Sensor VCC → Arduino 5V (**NOT D2!**)
+- [ ] Sensor DIS → Arduino D2
+- [ ] Sensor OUT → Arduino A0
+- [ ] Sensor GND → Arduino GND
 
 ### Assembly Steps
 
@@ -151,10 +143,10 @@ For this monitoring system, **always connect DIS to GND** - the power savings fr
    - SCL (A5) → LCD SCL
 
 3. **Connect Sensor:**
-   - D2 → Sensor VCC (GPIO-powered!)
+   - 5V → Sensor VCC (constant power)
+   - D2 → Sensor DIS (disable control)
    - GND → Sensor GND
    - A0 → Sensor OUT (analog output)
-   - **GND → Sensor DIS (disable pin - MUST connect!)**
 
 4. **Connect Buttons:**
    - D4 → Button UP Pin 1, GND → Button UP Pin 2
@@ -185,7 +177,7 @@ For this monitoring system, **always connect DIS to GND** - the power savings fr
 3. **Install Libraries:**
    - Sketch → Include Library → Manage Libraries
    - Search and install:
-     - **LiquidCrystal I2C** by Frank de Brabander (v1.1.2+)
+     - **LiquidCrystal I2C** by Frank de Brabander (v1.2.2+)
    - Built-in libraries (no install needed): Wire, EEPROM
 
 ### Upload Steps
@@ -202,9 +194,9 @@ For this monitoring system, **always connect DIS to GND** - the power savings fr
    - Wait for "Done uploading" message (~30 seconds)
 
 4. **Verify:**
-   - LCD should display: "Soil Monitor" / "v1.1"
-   - Status screen should appear with "M:--% ADC:0" / "Log:0/1344"
-   - Serial Monitor (115200 baud) should show: "Soil Humidity Monitor v1.1"
+   - LCD should display: "Soil Monitor" / "v1.2"
+   - Status screen should appear with "M:--% ADC:0" / "Log:0/672"
+   - Serial Monitor (115200 baud) should show: "Soil Humidity Monitor v1.2"
 
 **Troubleshooting Upload Errors:**
 - **Port not found:** Install CH340 USB drivers
@@ -220,13 +212,13 @@ For this monitoring system, **always connect DIS to GND** - the power savings fr
 LCD displays:
 ```
 Soil Monitor
-v1.1
+v1.2
 ```
 
 Then automatically shows **Status Screen**:
 ```
 M:--% ADC:0
-Log:0/1344
+Log:0/672
 ```
 
 **Note:** Moisture shows "--%" and ADC shows 0 until first sensor reading is taken (after calibration).
@@ -332,7 +324,7 @@ Default: 15 minutes (optimal for 14-day storage)
 **What you see:**
 ```
 M:75% ADC:7500
-Log:456/1344
+Log:456/672
 ```
 
 **Line 1:** Current moisture and raw sensor value
@@ -342,7 +334,7 @@ Log:456/1344
 - Shows "--%" before first calibration
 
 **Line 2:** Logged entries / total capacity
-- Example: "456/1344" = 456 readings stored, 1,344 max
+- Example: "456/672" = 456 readings stored, 672 max
 - When full, oldest entries are automatically overwritten (circular buffer)
 - **!** appears when buffer >90% full (warning to download data)
 
@@ -364,7 +356,7 @@ Log:456/1344
 ### Menu Structure
 
 ```
-STATUS SCREEN (default view: M:XX% ADC:XXXXX / Log:XXX/1344)
+STATUS SCREEN (default view: M:XX% ADC:XXXXX / Log:XXX/672)
 │
 SELECT → MAIN MENU
          ├── Settings
@@ -402,10 +394,10 @@ SELECT → MAIN MENU
 
 **How it works:**
 - Every 15 minutes (or your configured interval), the system:
-  1. Powers on sensor (D2 = HIGH)
-  2. Waits 200ms for warmup
-  3. Takes 20 ADC readings (averaged to reduce noise)
-  4. Powers off sensor (D2 = LOW)
+  1. Enables sensor (D2 = LOW, DIS pin enabled)
+  2. Waits 500ms for warmup (configurable via Settings)
+  3. Takes 10 ADC readings (median calculation, reduces noise)
+  4. Disables sensor (D2 = HIGH, DIS pin disabled)
   5. Converts to 0-100% using calibration
   6. Writes 4-byte entry to EEPROM
   7. Updates entry counter
@@ -441,7 +433,7 @@ SELECT → MAIN MENU
    - Serial Monitor shows metadata header
    - CSV data rows stream (Entry, Timestamp, Moisture%, etc.)
    - LCD shows progress bar: "Downloading... [####----] 50%"
-   - Takes ~30-60 seconds for 1,344 entries
+   - Takes ~60-120 seconds for 1,344 entries
 
 5. **Save CSV File:**
    - When complete, Serial Monitor shows: "# End of data export"
@@ -486,13 +478,13 @@ $port.Close()
 **Example output:**
 ```csv
 # Soil Humidity Monitor Data Export
-# Firmware Version: 1.0
+# Firmware Version: 1.3
 # Total Entries: 1234
 # Log Interval: 15 minutes
 # Sensor Calibration: Dry=12400, Wet=6000
 # Buffer Status: NOT_WRAPPED
 #
-Entry,Timestamp_Hours,Timestamp_Minutes,Moisture_%,Raw_ADC,Flags
+Entry,Timestamp_Hours,Timestamp_Minutes,Moisture_%,Median_ADC,Flags
 1,0.00,0,45,8500,0x00
 2,0.25,15,46,8450,0x00
 3,0.50,30,47,8400,0x00
@@ -505,8 +497,10 @@ Entry,Timestamp_Hours,Timestamp_Minutes,Moisture_%,Raw_ADC,Flags
 - **Timestamp_Hours:** Hours since monitoring started
 - **Timestamp_Minutes:** Total minutes since start
 - **Moisture_%:** Calibrated moisture (0-100%)
-- **Raw_ADC:** Raw 14-bit ADC value (0-16383)
+- **Median_ADC:** Median 14-bit ADC value from 10 samples (0-16383)
 - **Flags:** Status bits (0x00 = normal, 0x01 = sensor error)
+
+**Note:** Min/Max ADC values are displayed in live Serial Monitor output during logging but not stored in EEPROM or CSV export (v1.3+ memory optimization).
 
 ---
 
@@ -582,7 +576,7 @@ plt.figure(figsize=(12, 6))
 plt.plot(df['Timestamp_Hours'], df['Moisture_%'], linewidth=1)
 plt.xlabel('Time (hours)')
 plt.ylabel('Soil Moisture (%)')
-plt.title('2-Week Soil Moisture Monitoring')
+plt.title('1-Week Soil Moisture Monitoring')
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig('moisture_trend.png', dpi=300)
@@ -609,11 +603,12 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 ### Sensor Issues
 
 **Problem:** Moisture reads 0% or 100% constantly
-- **Cause:** Sensor not calibrated, incorrect calibration values, or **DIS pin not connected to GND**
+- **Cause:** Sensor not calibrated, incorrect calibration values, or **DIS pin not connected to D2**
 - **Fix:**
-  1. **FIRST: Check DIS pin connection!** If ADC reads 500-600, DIS pin is not connected to GND
-     - Verify DIS wire: Sensor DIS → Arduino GND
-     - After connecting DIS to GND, ADC should read 7,000-13,000
+  1. **FIRST: Check DIS pin connection!** If ADC reads 500-600, DIS pin wiring is incorrect
+     - Verify DIS wire: Sensor DIS → Arduino D2 (**NOT GND!**)
+     - Verify VCC wire: Sensor VCC → Arduino 5V (**NOT D2!**)
+     - After correct wiring, ADC should read 7,000-13,000
   2. Check raw ADC value on status screen (should be 7,000-13,000 range for Cytron sensor)
   3. Run calibration wizard: Main Menu → Calibrate → Run Wizard
   4. Watch live ADC during calibration to ensure values stabilize
@@ -632,23 +627,25 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 - **Fix:** Reposition sensor closer to roots, ensure soil contact
 
 **Problem:** ADC values very low (500-600 instead of 7,000-13,000)
-- **Cause:** **DIS pin not connected to GND** - sensor is disabled!
+- **Cause:** **DIS pin stuck HIGH or not connected to D2** - sensor is disabled!
 - **Symptoms:**
   - Status screen shows ADC:500-600 (instead of 7,000-13,000)
   - Moisture stuck at 100% even when sensor is in air
   - Calibration gives values like Dry=560, Wet=541 (completely wrong)
 - **Fix:**
-  1. **Connect Sensor DIS pin to Arduino GND** (critical!)
-  2. Power cycle Arduino
-  3. Check status screen - ADC should now read 10,000-13,000 in air
-  4. Put sensor in water - ADC should drop to 7,000-9,000
-  5. Re-run calibration wizard with correct ADC values
-- **Why this happens:** The Cytron MAKER-SOIL-MOISTURE has a 4th wire (DIS) that must be pulled LOW to enable the sensor. If floating or HIGH, sensor outputs ~0.15V (invalid).
+  1. **Connect Sensor DIS pin to Arduino D2** (critical!)
+  2. **Connect Sensor VCC to Arduino 5V** (NOT D2!)
+  3. Power cycle Arduino
+  4. Check status screen - ADC should now read 10,000-13,000 in air
+  5. Put sensor in water - ADC should drop to 7,000-9,000
+  6. Re-run calibration wizard with correct ADC values
+- **Why this happens:** The DIS pin controls sensor enable/disable. D2 must pulse LOW during readings. If DIS is not connected to D2 or D2 is stuck HIGH, sensor outputs ~0.15V (invalid).
+- **Migration note:** If upgrading from v1.0-1.3, you must rewire: VCC from D2→5V, DIS from GND→D2.
 
 **Problem:** Calibration wizard shows unstable ADC values (constantly jumping)
 - **Cause:** Electrical noise, poor sensor contact, or failing sensor
 - **Fix:**
-  1. Check sensor wiring connections (especially D2, A0, and **DIS to GND**)
+  1. Check sensor wiring connections (especially 5V, D2, A0, and **DIS to D2**)
   2. Ensure sensor is not near electrical interference (motors, WiFi routers)
   3. Try averaging: wait 5-10 seconds, watch for pattern in fluctuation
   4. If sensor physically damaged, replace it
@@ -744,7 +741,7 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 |-----------|-------|-------|
 | **Storage Capacity** | 1,344 entries | 5,376 bytes EEPROM |
 | **Storage Duration** | 14 days @ 15-min | User-adjustable 1-60 min |
-| **Entry Size** | 4 bytes | Moisture%, ADC (2B), flags |
+| **Entry Size** | 4 bytes | Moisture%, Median ADC, flags |
 | **Configuration Size** | 32 bytes | Calibration, settings, pointers |
 | **Unused EEPROM** | 2,784 bytes | Reserved for future features |
 | **Buffer Type** | Circular | Auto-overwrites oldest entries |
@@ -752,7 +749,7 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 | **Sensor Power Duty Cycle** | 0.02% | Extends sensor life 4-8× |
 | **Display Update Rate** | 2 seconds | When backlight active |
 | **Backlight Timeout** | 1 minute | Auto-sleep to save power |
-| **CSV Download Time** | 30-60 seconds | For 1,344 entries @ 115200 baud |
+| **CSV Download Time** | 60-120 seconds | For 1,344 entries @ 115200 baud |
 
 ### EEPROM Endurance
 
@@ -760,7 +757,7 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 - **Writes Per Day:** 96 entries (@ 15-min intervals)
 - **Lifespan:** ~2,850 days (~7.8 years) per address rotation
 - **Circular Buffer:** Each address written once every 14 days
-- **Effective Lifespan:** 39,600 years (not a concern)
+- **Effective Lifespan:** 79,200 years (not a concern)
 
 **Configuration header** (32 bytes) written only when user changes settings (~5 times over lifetime).
 
@@ -806,19 +803,19 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 | Parameter | Value | Notes |
 |-----------|-------|-------|
 | ADC Resolution | 14-bit | 0-16,383 (Arduino UNO R4 WiFi) |
-| Warmup Time | 200 ms | Before reading |
-| Reading Time | 200 ms | 20 samples × 10ms averaged |
-| Power-On Duration | 400 ms total | Per 15-min logging cycle |
-| Duty Cycle | 0.02% | Extends sensor life 4-8× |
-| Lifespan (continuous) | 3-6 months | Without GPIO power control |
-| Lifespan (GPIO-powered) | 1-2 years | With waterproofing + duty cycling |
+| Warmup Time | 1000 ms | Before reading |
+| Reading Time | 1000 ms | 10 samples × 100ms averaged |
+| Power-On Duration | 2000 ms total | Per 15-min logging cycle |
+| Duty Cycle | 0.04% | Extends sensor life 4-8× |
+| Lifespan (continuous) | 3-6 months | Without DIS pin control |
+| Lifespan (DIS-controlled) | 1-2 years | With waterproofing + duty cycling |
 
 **Common Issues:**
 
 | Symptom | Cause | Solution |
 |---------|-------|----------|
-| ADC reads 500-600 | DIS pin not connected to GND | Connect DIS → GND |
-| Moisture always 100% | ADC below wet calibration value | Check DIS pin, re-calibrate |
+| ADC reads 500-600 | DIS pin not connected to D2 | Connect DIS → D2, VCC → 5V |
+| Moisture always 100% | ADC below wet calibration value | Check DIS wiring, re-calibrate |
 | Moisture always 0% | ADC above dry calibration value | Re-calibrate sensor |
 | Unstable readings | Poor wiring or corrosion | Check connections, clean sensor |
 
@@ -854,7 +851,7 @@ print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
 
 ## Next Steps
 
-### After 2-Week Monitoring
+### After 1-Week Monitoring
 
 You now have quantitative data about your plant's watering needs!
 
@@ -893,4 +890,4 @@ You now have quantitative data about your plant's watering needs!
 - **BOM:** See [`BOM_MONITOR.md`](BOM_MONITOR.md)
 - **Project overview:** See [`../CLAUDE.md`](../CLAUDE.md)
 
-**Current firmware version:** v1.1 (stable)
+**Current firmware version:** v1.2 (stable)

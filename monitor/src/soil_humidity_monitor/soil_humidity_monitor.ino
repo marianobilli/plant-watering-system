@@ -1,23 +1,23 @@
 /*
  * Soil Humidity Monitor - Monitoring Variant
- * Version: 1.1
+ * Version: 1.4
  *
  * Hardware: Arduino UNO R4 WiFi
  * Display: 16x2 I2C LCD
  *
  * Features:
  * - Continuous soil moisture monitoring with live ADC display
- * - EEPROM circular buffer logging (14 days @ 15-min intervals)
- * - CSV data download via Serial (115200 baud)
+ * - EEPROM circular buffer logging (14 days @ 15-min intervals, 4 bytes/entry)
+ * - CSV data download via Serial (median ADC only, min/max in live serial)
  * - Sensor calibration wizard with live ADC feedback
  * - Manual calibration value editing
- * - User-adjustable log interval (1-60 minutes)
- * - GPIO-powered sensor (extends lifespan)
+ * - Configurable parameters (log interval, sensor timing, backlight timeout)
+ * - DIS-pin controlled sensor (extends lifespan)
  * - No watering functionality (monitoring only)
  *
  * Pin Assignments:
  * - A0: Soil Moisture Sensor (ADC)
- * - D2: Sensor Power Control
+ * - D2: Sensor Disable Control (DIS pin)
  * - D3: UNUSED (pump pin in POC)
  * - SDA (A4): LCD SDA
  * - SCL (A5): LCD SCL
@@ -37,16 +37,16 @@
 // ============================================================================
 
 #define VERSION_MAJOR       1
-#define VERSION_MINOR       1
-#define VERSION_STRING      "1.1"
-#define FIRMWARE_VERSION    ((VERSION_MAJOR << 8) | VERSION_MINOR)  // 0x0101
+#define VERSION_MINOR       4
+#define VERSION_STRING      "1.4"
+#define FIRMWARE_VERSION    ((VERSION_MAJOR << 8) | VERSION_MINOR)  // 0x0104
 
 // ============================================================================
 // PIN DEFINITIONS
 // ============================================================================
 
 #define SENSOR_ADC_PIN      A0    // Soil moisture sensor analog input
-#define SENSOR_POWER_PIN    2     // GPIO power control for sensor
+#define SENSOR_DISABLE_PIN  2     // DIS pin control (HIGH=disabled, LOW=enabled)
 #define BTN_UP              4     // Navigation button: UP
 #define BTN_DOWN            5     // Navigation button: DOWN
 #define BTN_SELECT          6     // Navigation button: SELECT
@@ -73,6 +73,12 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define EEPROM_TOTAL_ENTRIES_ADDR   14   // 4 bytes: Total entries written
 #define EEPROM_FIRST_TS_ADDR        18   // 2 bytes: First entry timestamp (hours)
 #define EEPROM_FLAGS_ADDR           20   // 1 byte: Buffer flags
+// New configuration parameters (v1.2)
+#define EEPROM_BACKLIGHT_TIMEOUT_ADDR  21  // 2 bytes: Backlight timeout (minutes)
+#define EEPROM_SENSOR_WARMUP_ADDR      23  // 2 bytes: Sensor warmup (milliseconds)
+#define EEPROM_NUM_MEASUREMENTS_ADDR   25  // 1 byte: Number of measurements (5-50)
+#define EEPROM_MEASUREMENT_DELAY_ADDR  26  // 2 bytes: Delay between measurements (ms)
+// Bytes 28-30: Reserved for future expansion
 #define EEPROM_HEADER_CHECKSUM_ADDR 31   // 1 byte: Header checksum
 
 // Data section (32-5407: 5376 bytes = 1344 entries × 4 bytes)
@@ -96,24 +102,36 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 // ============================================================================
 
 struct Config {
-    uint16_t logInterval;       // Log interval in minutes (1-60)
-    uint16_t sensorDry;         // ADC value when sensor is in air (14-bit: 0-16383)
-    uint16_t sensorWet;         // ADC value when sensor is in water (14-bit: 0-16383)
-    uint32_t writePointer;      // Current write position in circular buffer
-    uint32_t totalEntries;      // Total entries written (lifetime)
-    uint16_t firstTimestamp;    // Hours since boot for first entry
-    uint8_t flags;              // Buffer status flags
+    uint16_t logInterval;           // Log interval in minutes (1-60)
+    uint16_t sensorDry;             // ADC value when sensor is in air (14-bit: 0-16383)
+    uint16_t sensorWet;             // ADC value when sensor is in water (14-bit: 0-16383)
+    uint32_t writePointer;          // Current write position in circular buffer
+    uint32_t totalEntries;          // Total entries written (lifetime)
+    uint16_t firstTimestamp;        // Hours since boot for first entry
+    uint8_t flags;                  // Buffer status flags
+
+    // New in v1.2
+    uint16_t backlightTimeout;      // Backlight timeout (minutes, 1-60)
+    uint16_t sensorWarmup;          // Sensor warmup delay (milliseconds, 100-2000)
+    uint8_t numMeasurements;        // Number of samples for median (5-50)
+    uint16_t measurementDelay;      // Delay between samples (milliseconds, 10-500)
 };
 
 // Default configuration
 Config config = {
-    .logInterval = 15,          // 15 minutes (exactly 14 days)
-    .sensorDry = 12400,         // Typical 14-bit ADC value in air
-    .sensorWet = 6000,          // Typical 14-bit ADC value in water
-    .writePointer = 0,          // Start of buffer
-    .totalEntries = 0,          // No entries yet
-    .firstTimestamp = 0,        // 0 hours (boot time)
-    .flags = 0                  // No flags set
+    .logInterval = 15,              // 15 minutes (14 days @ 4 bytes/entry)
+    .sensorDry = 12400,             // Typical 14-bit ADC value in air
+    .sensorWet = 6000,              // Typical 14-bit ADC value in water
+    .writePointer = 0,              // Start of buffer
+    .totalEntries = 0,              // No entries yet
+    .firstTimestamp = 0,            // 0 hours (boot time)
+    .flags = 0,                     // No flags set
+
+    // v1.2 defaults
+    .backlightTimeout = 1,          // 1 minute
+    .sensorWarmup = 500,            // 500ms (v1.4: DIS control, VCC stable)
+    .numMeasurements = 10,          // 10 samples
+    .measurementDelay = 100         // 100ms between samples
 };
 
 // ============================================================================
@@ -121,9 +139,20 @@ Config config = {
 // ============================================================================
 
 struct LogEntry {
-    uint8_t moisturePercent;    // 0-100%
-    uint16_t rawADC;            // 14-bit ADC value (0-16383)
-    uint8_t flags;              // Status flags
+    uint8_t moisturePercent;        // 0-100%
+    uint16_t rawADC;                // Median ADC value (14-bit: 0-16383)
+    uint8_t flags;                  // Status flags
+};
+
+// ============================================================================
+// MOISTURE STATISTICS STRUCTURE
+// ============================================================================
+
+// Structure to hold moisture statistics (median + min/max)
+struct MoistureStats {
+    int median;
+    int minADC;
+    int maxADC;
 };
 
 // ============================================================================
@@ -131,11 +160,15 @@ struct LogEntry {
 // ============================================================================
 
 enum MenuState {
-    STATUS_SCREEN,          // Default: Live moisture display
-    MAIN_MENU,             // Menu selection
-    SETTINGS_MENU,         // Settings submenu
-    SETTING_LOG_INTERVAL,  // Adjust log interval
-    CALIBRATE_MENU,        // Calibration submenu (Dry/Wet selection)
+    STATUS_SCREEN,                  // Default: Live moisture display
+    MAIN_MENU,                     // Menu selection
+    SETTINGS_MENU,                 // Settings submenu
+    SETTING_LOG_INTERVAL,          // Adjust log interval
+    SETTING_BACKLIGHT_TIMEOUT,     // Adjust LCD sleep timeout (v1.2)
+    SETTING_SENSOR_WARMUP,         // Adjust sensor warmup delay (v1.2)
+    SETTING_NUM_MEASUREMENTS,      // Adjust number of samples (v1.2)
+    SETTING_MEASUREMENT_DELAY,     // Adjust delay between samples (v1.2)
+    CALIBRATE_MENU,                // Calibration submenu (Dry/Wet selection)
     CAL_DRY_MENU,          // Dry value submenu (Measure/Edit)
     CAL_WET_MENU,          // Wet value submenu (Measure/Edit)
     CAL_DRY_MEASURE,       // Measure dry value (in air)
@@ -176,7 +209,7 @@ unsigned long lastButtonPress = 0;
 
 // Display update intervals
 #define DISPLAY_UPDATE_INTERVAL 2000    // 2 seconds
-#define BACKLIGHT_TIMEOUT 60000         // 1 minute
+// #define BACKLIGHT_TIMEOUT 60000      // REMOVED - now configurable via Settings menu
 
 // ============================================================================
 // SETUP
@@ -193,14 +226,14 @@ void setup() {
     analogReadResolution(14);
 
     // Initialize pins
-    pinMode(SENSOR_POWER_PIN, OUTPUT);
+    pinMode(SENSOR_DISABLE_PIN, OUTPUT);
     pinMode(BTN_UP, INPUT_PULLUP);
     pinMode(BTN_DOWN, INPUT_PULLUP);
     pinMode(BTN_SELECT, INPUT_PULLUP);
     pinMode(BTN_BACK, INPUT_PULLUP);
 
-    // Ensure sensor is off
-    digitalWrite(SENSOR_POWER_PIN, LOW);
+    // Ensure sensor is disabled initially
+    digitalWrite(SENSOR_DISABLE_PIN, HIGH);
 
     // Initialize LCD
     lcd.init();
@@ -238,17 +271,17 @@ void loop() {
     // Update display if on status screen AND backlight is on
     if (currentState == STATUS_SCREEN && backlightOn &&
         currentTime - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
-        lastDisplayUpdate = currentTime;
         currentMoisture = readMoisture();
         displayMenu();
+        lastDisplayUpdate = millis();  // Reset timer AFTER sensor reading completes
     }
 
     // Update display during calibration to show live ADC values
     if ((currentState == CAL_DRY_MEASURE || currentState == CAL_WET_MEASURE) && backlightOn &&
         currentTime - lastDisplayUpdate >= 500) {  // Update every 500ms for faster feedback
-        lastDisplayUpdate = currentTime;
         currentRawADC = readMoistureRaw();
         displayMenu();
+        lastDisplayUpdate = millis();  // Reset timer AFTER sensor reading completes
     }
 
     // Log moisture reading at configured interval
@@ -269,42 +302,64 @@ void loop() {
 // ============================================================================
 
 int readMoisture() {
-    // Power on sensor from GPIO (extends sensor life dramatically)
-    digitalWrite(SENSOR_POWER_PIN, HIGH);
-    delay(500); // Increased warmup time for stable reading (was 200ms)
+    digitalWrite(SENSOR_DISABLE_PIN, LOW);  // Enable sensor (DIS LOW = active)
+    delay(config.sensorWarmup);  // Use configurable warmup time
 
-    // Discard first few unstable samples, then average
-    const int discardSamples = 5;   // Throw away first 5 readings
-    const int numSamples = 20;      // Average next 20 readings
+    // Allocate sample array dynamically based on config
+    int* samples = new int[config.numMeasurements];
+    int minADC = 16383;  // Track minimum
+    int maxADC = 0;      // Track maximum
 
-    // Discard initial unstable readings
-    for (int i = 0; i < discardSamples; i++) {
-        analogRead(SENSOR_ADC_PIN);
-        delay(10);
+    // Collect samples (NO DISCARDING - warmup handles stabilization)
+    for (int i = 0; i < config.numMeasurements; i++) {
+        int reading = analogRead(SENSOR_ADC_PIN);
+        samples[i] = reading;
+
+        // Track min/max
+        if (reading < minADC) minADC = reading;
+        if (reading > maxADC) maxADC = reading;
+
+        if (i < config.numMeasurements - 1) {
+            delay(config.measurementDelay);  // Configurable delay
+        }
     }
 
-    // Average stable samples to reduce noise (Arduino UNO R4 has 14-bit ADC)
-    long sum = 0;
-    for (int i = 0; i < numSamples; i++) {
-        sum += analogRead(SENSOR_ADC_PIN);
-        delay(10);
+    // Sort for median (bubble sort)
+    for (int i = 0; i < config.numMeasurements - 1; i++) {
+        for (int j = 0; j < config.numMeasurements - i - 1; j++) {
+            if (samples[j] > samples[j + 1]) {
+                int temp = samples[j];
+                samples[j] = samples[j + 1];
+                samples[j + 1] = temp;
+            }
+        }
     }
-    int avgReading = sum / numSamples;
 
-    // Save raw ADC value for display
-    currentRawADC = avgReading;
+    // Calculate median (handles both odd and even sample counts)
+    int medianReading;
+    if (config.numMeasurements % 2 == 0) {
+        int mid = config.numMeasurements / 2;
+        medianReading = (samples[mid - 1] + samples[mid]) / 2;
+    } else {
+        medianReading = samples[config.numMeasurements / 2];
+    }
 
-    // Power off sensor
-    digitalWrite(SENSOR_POWER_PIN, LOW);
+    delete[] samples;  // Free memory
+
+    currentRawADC = medianReading;
+    digitalWrite(SENSOR_DISABLE_PIN, HIGH);  // Disable sensor (DIS HIGH = sleep)
 
     // Convert to percentage using calibration values
-    // Arduino UNO R4: ADC is 14-bit (0-16383)
-    int moisturePercent = map(avgReading, config.sensorDry, config.sensorWet, 0, 100);
+    int moisturePercent = map(medianReading, config.sensorDry, config.sensorWet, 0, 100);
     moisturePercent = constrain(moisturePercent, 0, 100);
 
     Serial.print(F("ADC: "));
-    Serial.print(avgReading);
-    Serial.print(F(" -> "));
+    Serial.print(medianReading);
+    Serial.print(F(" ("));
+    Serial.print(minADC);
+    Serial.print(F("-"));
+    Serial.print(maxADC);
+    Serial.print(F(") -> "));
     Serial.print(moisturePercent);
     Serial.println(F("%"));
 
@@ -312,31 +367,87 @@ int readMoisture() {
 }
 
 int readMoistureRaw() {
-    // Read raw ADC value (for calibration and logging)
-    digitalWrite(SENSOR_POWER_PIN, HIGH);
-    delay(500); // Increased warmup time for stable reading (was 200ms)
+    // Read raw ADC value (for calibration - returns median only)
+    digitalWrite(SENSOR_DISABLE_PIN, LOW);  // Enable sensor (DIS LOW = active)
+    delay(config.sensorWarmup);  // Configurable
 
-    // Discard first few unstable samples, then average
-    const int discardSamples = 5;   // Throw away first 5 readings
-    const int numSamples = 20;      // Average next 20 readings
+    int* samples = new int[config.numMeasurements];
 
-    // Discard initial unstable readings
-    for (int i = 0; i < discardSamples; i++) {
-        analogRead(SENSOR_ADC_PIN);
-        delay(10);
+    for (int i = 0; i < config.numMeasurements; i++) {
+        samples[i] = analogRead(SENSOR_ADC_PIN);
+        if (i < config.numMeasurements - 1) {
+            delay(config.measurementDelay);
+        }
     }
 
-    // Average stable samples
-    long sum = 0;
-    for (int i = 0; i < numSamples; i++) {
-        sum += analogRead(SENSOR_ADC_PIN);
-        delay(10);
+    // Sort for median
+    for (int i = 0; i < config.numMeasurements - 1; i++) {
+        for (int j = 0; j < config.numMeasurements - i - 1; j++) {
+            if (samples[j] > samples[j + 1]) {
+                int temp = samples[j];
+                samples[j] = samples[j + 1];
+                samples[j + 1] = temp;
+            }
+        }
     }
-    int avgReading = sum / numSamples;
 
-    digitalWrite(SENSOR_POWER_PIN, LOW);
+    int median;
+    if (config.numMeasurements % 2 == 0) {
+        int mid = config.numMeasurements / 2;
+        median = (samples[mid - 1] + samples[mid]) / 2;
+    } else {
+        median = samples[config.numMeasurements / 2];
+    }
 
-    return avgReading;
+    delete[] samples;
+    digitalWrite(SENSOR_DISABLE_PIN, HIGH);  // Disable sensor (DIS HIGH = sleep)
+
+    return median;
+}
+
+MoistureStats readMoistureWithStats() {
+    // Read moisture with full statistics (median + min + max) for logging
+    digitalWrite(SENSOR_DISABLE_PIN, LOW);  // Enable sensor (DIS LOW = active)
+    delay(config.sensorWarmup);
+
+    int* samples = new int[config.numMeasurements];
+    int minADC = 16383;
+    int maxADC = 0;
+
+    for (int i = 0; i < config.numMeasurements; i++) {
+        int reading = analogRead(SENSOR_ADC_PIN);
+        samples[i] = reading;
+        if (reading < minADC) minADC = reading;
+        if (reading > maxADC) maxADC = reading;
+        if (i < config.numMeasurements - 1) {
+            delay(config.measurementDelay);
+        }
+    }
+
+    // Sort for median
+    for (int i = 0; i < config.numMeasurements - 1; i++) {
+        for (int j = 0; j < config.numMeasurements - i - 1; j++) {
+            if (samples[j] > samples[j + 1]) {
+                int temp = samples[j];
+                samples[j] = samples[j + 1];
+                samples[j + 1] = temp;
+            }
+        }
+    }
+
+    int median;
+    if (config.numMeasurements % 2 == 0) {
+        int mid = config.numMeasurements / 2;
+        median = (samples[mid - 1] + samples[mid]) / 2;
+    } else {
+        median = samples[config.numMeasurements / 2];
+    }
+
+    delete[] samples;
+    digitalWrite(SENSOR_DISABLE_PIN, HIGH);  // Disable sensor (DIS HIGH = sleep)
+
+    MoistureStats stats = {median, minADC, maxADC};
+    return stats;
 }
 
 uint8_t detectSensorErrors(int rawADC) {
@@ -360,20 +471,25 @@ uint8_t detectSensorErrors(int rawADC) {
 // ============================================================================
 
 void logMoistureReading() {
-    int rawADC = readMoistureRaw();
-    int moisture = map(rawADC, config.sensorDry, config.sensorWet, 0, 100);
+    MoistureStats stats = readMoistureWithStats();
+
+    int moisture = map(stats.median, config.sensorDry, config.sensorWet, 0, 100);
     moisture = constrain(moisture, 0, 100);
 
-    uint8_t flags = detectSensorErrors(rawADC);
+    uint8_t flags = detectSensorErrors(stats.median);
 
-    writeLogEntry(moisture, rawADC, flags);
+    writeLogEntry(moisture, stats.median, flags);
 
     Serial.print(F("Logged entry #"));
     Serial.print(config.totalEntries);
     Serial.print(F(": "));
     Serial.print(moisture);
     Serial.print(F("% (ADC="));
-    Serial.print(rawADC);
+    Serial.print(stats.median);
+    Serial.print(F(", min="));
+    Serial.print(stats.minADC);
+    Serial.print(F(", max="));
+    Serial.print(stats.maxADC);
     Serial.println(F(")"));
 
     // Update display if on status screen
@@ -382,15 +498,15 @@ void logMoistureReading() {
     }
 }
 
-void writeLogEntry(uint8_t moisture, uint16_t rawADC, uint8_t flags) {
+void writeLogEntry(uint8_t moisture, uint16_t medianADC, uint8_t flags) {
     // Calculate EEPROM address in circular buffer
     uint16_t entryOffset = (config.writePointer % MAX_ENTRIES) * ENTRY_SIZE;
     uint16_t addr = EEPROM_DATA_START_ADDR + entryOffset;
 
-    // Write entry (4 bytes)
+    // Write 4-byte entry
     EEPROM.write(addr + 0, moisture);
-    EEPROM.write(addr + 1, rawADC >> 8);    // High byte
-    EEPROM.write(addr + 2, rawADC & 0xFF);  // Low byte
+    EEPROM.write(addr + 1, medianADC >> 8);      // Median high byte
+    EEPROM.write(addr + 2, medianADC & 0xFF);    // Median low byte
     EEPROM.write(addr + 3, flags);
 
     // Update write pointer and total count
@@ -477,7 +593,7 @@ void downloadDataToSerial() {
     Serial.print(F("# Buffer Status: "));
     Serial.println((config.flags & FLAG_BUFFER_WRAPPED) ? F("WRAPPED") : F("NOT_WRAPPED"));
     Serial.println(F("#"));
-    Serial.println(F("Entry,Timestamp_Hours,Timestamp_Minutes,Moisture_%,Raw_ADC,Flags"));
+    Serial.println(F("Entry,Timestamp_Hours,Timestamp_Minutes,Moisture_%,Median_ADC,Flags"));
 
     // Send data rows
     for (uint32_t i = 0; i < entryCount; i++) {
@@ -487,7 +603,7 @@ void downloadDataToSerial() {
         float hours = config.firstTimestamp + (i * config.logInterval / 60.0);
         uint32_t minutes = i * config.logInterval;
 
-        // CSV row: Entry,Hours,Minutes,Moisture,ADC,Flags
+        // CSV row: Entry,Hours,Minutes,Moisture,Median,Flags
         Serial.print(i + 1);
         Serial.print(',');
         Serial.print(hours, 2);
@@ -496,7 +612,7 @@ void downloadDataToSerial() {
         Serial.print(',');
         Serial.print(entry.moisturePercent);
         Serial.print(',');
-        Serial.print(entry.rawADC);
+        Serial.print(entry.rawADC);      // Median
         Serial.print(',');
         Serial.print(F("0x"));
         Serial.println(entry.flags, HEX);
@@ -579,6 +695,30 @@ void loadConfig() {
     config.firstTimestamp = (EEPROM.read(EEPROM_FIRST_TS_ADDR) << 8) | EEPROM.read(EEPROM_FIRST_TS_ADDR + 1);
     config.flags = EEPROM.read(EEPROM_FLAGS_ADDR);
 
+    // Load v1.2 parameters (with defaults if not present or invalid)
+    config.backlightTimeout = (EEPROM.read(EEPROM_BACKLIGHT_TIMEOUT_ADDR) << 8) |
+                              EEPROM.read(EEPROM_BACKLIGHT_TIMEOUT_ADDR + 1);
+    if (config.backlightTimeout < 1 || config.backlightTimeout > 60) {
+        config.backlightTimeout = 1;  // Default 1 minute
+    }
+
+    config.sensorWarmup = (EEPROM.read(EEPROM_SENSOR_WARMUP_ADDR) << 8) |
+                          EEPROM.read(EEPROM_SENSOR_WARMUP_ADDR + 1);
+    if (config.sensorWarmup < 100 || config.sensorWarmup > 2000) {
+        config.sensorWarmup = 1000;  // Default 1000ms
+    }
+
+    config.numMeasurements = EEPROM.read(EEPROM_NUM_MEASUREMENTS_ADDR);
+    if (config.numMeasurements < 5 || config.numMeasurements > 50) {
+        config.numMeasurements = 10;  // Default 10 samples
+    }
+
+    config.measurementDelay = (EEPROM.read(EEPROM_MEASUREMENT_DELAY_ADDR) << 8) |
+                              EEPROM.read(EEPROM_MEASUREMENT_DELAY_ADDR + 1);
+    if (config.measurementDelay < 10 || config.measurementDelay > 500) {
+        config.measurementDelay = 100;  // Default 100ms
+    }
+
     Serial.println(F("Config loaded from EEPROM"));
 }
 
@@ -598,6 +738,18 @@ void saveConfig() {
     EEPROM.write(EEPROM_CAL_DRY_ADDR + 1, config.sensorDry & 0xFF);
     EEPROM.write(EEPROM_CAL_WET_ADDR, config.sensorWet >> 8);
     EEPROM.write(EEPROM_CAL_WET_ADDR + 1, config.sensorWet & 0xFF);
+
+    // Write v1.2 parameters
+    EEPROM.write(EEPROM_BACKLIGHT_TIMEOUT_ADDR, config.backlightTimeout >> 8);
+    EEPROM.write(EEPROM_BACKLIGHT_TIMEOUT_ADDR + 1, config.backlightTimeout & 0xFF);
+
+    EEPROM.write(EEPROM_SENSOR_WARMUP_ADDR, config.sensorWarmup >> 8);
+    EEPROM.write(EEPROM_SENSOR_WARMUP_ADDR + 1, config.sensorWarmup & 0xFF);
+
+    EEPROM.write(EEPROM_NUM_MEASUREMENTS_ADDR, config.numMeasurements);
+
+    EEPROM.write(EEPROM_MEASUREMENT_DELAY_ADDR, config.measurementDelay >> 8);
+    EEPROM.write(EEPROM_MEASUREMENT_DELAY_ADDR + 1, config.measurementDelay & 0xFF);
 
     // Write buffer pointers and metadata
     saveMetadata();
@@ -651,6 +803,12 @@ void resetToDefaults() {
     config.firstTimestamp = millis() / 3600000UL;
     config.flags = 0;
 
+    // v1.2 defaults
+    config.backlightTimeout = 1;        // 1 minute
+    config.sensorWarmup = 1000;         // 1000ms
+    config.numMeasurements = 10;        // 10 samples
+    config.measurementDelay = 100;      // 100ms
+
     saveConfig();
 
     lcd.clear();
@@ -664,7 +822,8 @@ void resetToDefaults() {
 // ============================================================================
 
 void updateBacklight() {
-    if (backlightOn && (millis() - lastActivity > BACKLIGHT_TIMEOUT)) {
+    unsigned long timeoutMs = (unsigned long)config.backlightTimeout * 60000UL;
+    if (backlightOn && (millis() - lastActivity > timeoutMs)) {
         lcd.noBacklight();
         backlightOn = false;
         Serial.println(F("Backlight off (timeout)"));
@@ -730,7 +889,7 @@ void handleUpButton() {
             break;
 
         case SETTINGS_MENU:
-            settingsIndex = (settingsIndex > 0) ? settingsIndex - 1 : 0;
+            settingsIndex = (settingsIndex > 0) ? settingsIndex - 1 : 4;
             displayMenu();
             break;
 
@@ -767,6 +926,26 @@ void handleUpButton() {
             config.logInterval = min(60, config.logInterval + 1);
             displayMenu();
             break;
+
+        case SETTING_BACKLIGHT_TIMEOUT:
+            config.backlightTimeout = min(60, config.backlightTimeout + 1);
+            displayMenu();
+            break;
+
+        case SETTING_SENSOR_WARMUP:
+            config.sensorWarmup = min(2000, config.sensorWarmup + 100);
+            displayMenu();
+            break;
+
+        case SETTING_NUM_MEASUREMENTS:
+            config.numMeasurements = min(50, config.numMeasurements + 1);
+            displayMenu();
+            break;
+
+        case SETTING_MEASUREMENT_DELAY:
+            config.measurementDelay = min(500, config.measurementDelay + 10);
+            displayMenu();
+            break;
     }
 }
 
@@ -778,8 +957,7 @@ void handleDownButton() {
             break;
 
         case SETTINGS_MENU:
-            // Only 1 item in Settings menu, keep at index 0
-            settingsIndex = 0;
+            settingsIndex = (settingsIndex < 4) ? settingsIndex + 1 : 0;
             displayMenu();
             break;
 
@@ -814,6 +992,26 @@ void handleDownButton() {
 
         case SETTING_LOG_INTERVAL:
             config.logInterval = max(1, config.logInterval - 1);
+            displayMenu();
+            break;
+
+        case SETTING_BACKLIGHT_TIMEOUT:
+            config.backlightTimeout = max(1, config.backlightTimeout - 1);
+            displayMenu();
+            break;
+
+        case SETTING_SENSOR_WARMUP:
+            config.sensorWarmup = max(100, config.sensorWarmup - 100);
+            displayMenu();
+            break;
+
+        case SETTING_NUM_MEASUREMENTS:
+            config.numMeasurements = max(5, config.numMeasurements - 1);
+            displayMenu();
+            break;
+
+        case SETTING_MEASUREMENT_DELAY:
+            config.measurementDelay = max(10, config.measurementDelay - 10);
             displayMenu();
             break;
     }
@@ -861,13 +1059,21 @@ void handleSelectButton() {
             break;
 
         case SETTINGS_MENU:
-            if (settingsIndex == 0) {
-                currentState = SETTING_LOG_INTERVAL;
-                displayMenu();
+            switch (settingsIndex) {
+                case 0: currentState = SETTING_LOG_INTERVAL; break;
+                case 1: currentState = SETTING_BACKLIGHT_TIMEOUT; break;
+                case 2: currentState = SETTING_SENSOR_WARMUP; break;
+                case 3: currentState = SETTING_NUM_MEASUREMENTS; break;
+                case 4: currentState = SETTING_MEASUREMENT_DELAY; break;
             }
+            displayMenu();
             break;
 
         case SETTING_LOG_INTERVAL:
+        case SETTING_BACKLIGHT_TIMEOUT:
+        case SETTING_SENSOR_WARMUP:
+        case SETTING_NUM_MEASUREMENTS:
+        case SETTING_MEASUREMENT_DELAY:
             saveConfig();
             currentState = SETTINGS_MENU;
             displayMenu();
@@ -991,6 +1197,10 @@ void handleBackButton() {
             break;
 
         case SETTING_LOG_INTERVAL:
+        case SETTING_BACKLIGHT_TIMEOUT:
+        case SETTING_SENSOR_WARMUP:
+        case SETTING_NUM_MEASUREMENTS:
+        case SETTING_MEASUREMENT_DELAY:
             currentState = SETTINGS_MENU;
             displayMenu();
             break;
@@ -1063,9 +1273,17 @@ void displayMenu() {
 
         case SETTINGS_MENU:
             lcd.setCursor(0, 0);
-            lcd.print(F("SETTINGS"));
+            lcd.print(F("SETTINGS ("));
+            lcd.print(settingsIndex + 1);
+            lcd.print(F("/5)"));
             lcd.setCursor(0, 1);
-            lcd.print(F(">Log Interval"));
+            switch (settingsIndex) {
+                case 0: lcd.print(F(">Log Interval")); break;
+                case 1: lcd.print(F(">LCD Sleep")); break;
+                case 2: lcd.print(F(">Sensor Warmup")); break;
+                case 3: lcd.print(F(">Num Samples")); break;
+                case 4: lcd.print(F(">Sample Delay")); break;
+            }
             break;
 
         case SETTING_LOG_INTERVAL:
@@ -1074,6 +1292,38 @@ void displayMenu() {
             lcd.setCursor(0, 1);
             lcd.print(config.logInterval);
             lcd.print(F("min UP/DN SEL"));
+            break;
+
+        case SETTING_BACKLIGHT_TIMEOUT:
+            lcd.setCursor(0, 0);
+            lcd.print(F("LCD Sleep"));
+            lcd.setCursor(0, 1);
+            lcd.print(config.backlightTimeout);
+            lcd.print(F("min UP/DN SEL"));
+            break;
+
+        case SETTING_SENSOR_WARMUP:
+            lcd.setCursor(0, 0);
+            lcd.print(F("Sensor Warmup"));
+            lcd.setCursor(0, 1);
+            lcd.print(config.sensorWarmup);
+            lcd.print(F("ms UP/DN SEL"));
+            break;
+
+        case SETTING_NUM_MEASUREMENTS:
+            lcd.setCursor(0, 0);
+            lcd.print(F("Num Samples"));
+            lcd.setCursor(0, 1);
+            lcd.print(config.numMeasurements);
+            lcd.print(F(" UP/DN SEL"));
+            break;
+
+        case SETTING_MEASUREMENT_DELAY:
+            lcd.setCursor(0, 0);
+            lcd.print(F("Sample Delay"));
+            lcd.setCursor(0, 1);
+            lcd.print(config.measurementDelay);
+            lcd.print(F("ms UP/DN SEL"));
             break;
 
         case CALIBRATE_MENU:

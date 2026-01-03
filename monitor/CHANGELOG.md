@@ -6,6 +6,101 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.0] - 2026-01-04
+
+### Changed
+- **Sensor control method**: Switched from VCC GPIO power cycling to DIS pin GPIO control
+  - Sensor VCC now connects to 5V (constant power) instead of D2
+  - D2 now controls DIS pin: HIGH = disabled (sleep), LOW = enabled (active)
+  - **INVERTED LOGIC** compared to previous power control (v1.0-1.3)
+- **Pin definition rename**: `SENSOR_POWER_PIN` → `SENSOR_DISABLE_PIN` for clarity
+- **Wiring update**: Sensor DIS pin connects to D2, VCC connects to 5V rail
+- **Warmup time reduced**: 1000ms → 500ms (VCC already stable, faster sensor response)
+
+### Benefits
+- Faster sensor wake-up (no VCC capacitor charging delay)
+- More stable power supply (VCC always connected to 5V rail)
+- Sensor retains internal state between readings (improved consistency)
+- Same longevity benefits (0.02% duty cycle still applies, extends sensor life 4-8×)
+
+### Migration Notes (IMPORTANT!)
+
+**Hardware change required:**
+1. REMOVE: Sensor VCC from D2
+2. ADD: Sensor VCC to Arduino 5V
+3. REMOVE: Sensor DIS from GND
+4. ADD: Sensor DIS to Arduino D2
+
+**Firmware incompatible with old wiring:**
+- v1.4 firmware + old wiring (VCC on D2) = WRONG READINGS
+- v1.0-1.3 firmware + new wiring (DIS on D2) = WRONG READINGS
+- Must upgrade firmware AND rewire sensor together
+
+**Configuration preserved:**
+- EEPROM configuration remains compatible (same 32-byte header)
+- Calibration values preserved (no need to recalibrate unless ADC characteristics change)
+- Existing logged data can be downloaded before upgrade
+
+### Technical Details
+- Sensor disable current: 0.14mA (per Cytron MAKER-SOIL-MOISTURE datasheet)
+- Sensor active current: 3.6mA (per datasheet)
+- Duty cycle unchanged: 0.02% (1 second per 15 minutes at 500ms warmup)
+- Average current: ~0.15mA (negligible increase from previous 0.008mA)
+
+---
+
+## [1.3.0] - 2026-01-03
+
+### Changed
+- **Memory optimization**: Removed min/max ADC values from EEPROM storage (saves 4 bytes per entry)
+- **Storage capacity doubled**: 672 → 1,344 entries (7 days → 14 days @ 15-min intervals)
+- **Log entry size**: Reduced from 8 to 4 bytes (moisture %, median ADC, flags only)
+- **CSV format simplified**: Removed `Min_ADC` and `Max_ADC` columns (6 columns instead of 8)
+- **Updated sensor defaults**: Warmup 500ms → 1000ms, samples 20 → 10, delay 10ms → 100ms (improved stability)
+
+### Technical Details
+- **Entry format**: 4 bytes (1 moisture + 2 median ADC + 1 flags)
+- **Storage capacity**: 1,344 entries × 4 bytes = 5,376 bytes
+- **Duration @ 15-min intervals**: 14.0 days (was 7.0 days)
+- **Min/max ADC**: Still calculated and displayed in live Serial Monitor output, but not stored in EEPROM or CSV export
+- **EEPROM write reduction**: 50% fewer bytes written per log interval (extends EEPROM lifespan)
+
+### Benefits
+- 2× longer monitoring periods without downloading data
+- Simpler CSV format for analysis (fewer columns)
+- Reduced EEPROM wear (50% fewer writes per entry)
+- Min/max still available for real-time debugging via Serial Monitor (115200 baud)
+
+---
+
+## [1.2.0] - 2026-01-03
+
+### Added
+- **Configurable sensor parameters** (via Settings menu):
+  - Backlight timeout: 1-60 minutes (was hardcoded to 1 min)
+  - Sensor warmup delay: 100-2000 ms in 100ms increments
+  - Number of measurements: 5-50 samples for median calculation
+  - Measurement delay: 10-500 ms in 50ms increments
+- **Min/Max ADC tracking**: CSV export now includes min/max ADC values per entry
+- **Enhanced Settings menu**: Expanded from 1 to 5 configurable parameters
+
+### Changed
+- **Log entry size**: Expanded from 4 to 8 bytes to store min/max ADC
+- **Storage capacity**: Reduced from 1,344 to 672 entries (14 days → 7 days @ 15-min intervals)
+- **CSV format**: Added `Min_ADC` and `Max_ADC` columns, renamed `Raw_ADC` to `Median_ADC`
+- **Median calculation**: Now handles odd/even sample counts correctly
+
+### Removed
+- **5 discarded samples**: No longer discard initial readings (faster, configurable warmup instead)
+
+### Fixed
+- **Memory efficiency**: Dynamic sample allocation (saves RAM with fewer samples)
+- **Median calculation**: Handles odd sample counts (not just even)
+- **Display refresh timing**: Timer now resets AFTER sensor reading completes (ensures consistent 2-second intervals)
+- **Sample delay increment**: Corrected to 10ms steps (was incorrectly 50ms)
+
+---
+
 ## [1.1] - 2026-01-02
 
 ### Added
