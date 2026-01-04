@@ -1,6 +1,6 @@
 /*
  * Soil Humidity Monitor - Monitoring Variant
- * Version: 1.4
+ * Version: 1.5
  *
  * Hardware: Arduino UNO R4 WiFi
  * Display: 16x2 I2C LCD
@@ -11,6 +11,7 @@
  * - CSV data download via Serial (median ADC only, min/max in live serial)
  * - Sensor calibration wizard with live ADC feedback
  * - Manual calibration value editing
+ * - Depth-based wet calibration (10-60cm lookup table)
  * - Configurable parameters (log interval, sensor timing, backlight timeout)
  * - DIS-pin controlled sensor (extends lifespan)
  * - No watering functionality (monitoring only)
@@ -26,6 +27,12 @@
  * - D6: Button SELECT
  * - D7: Button BACK
  * - D10-D13: UNUSED (SD card in POC)
+ *
+ * Changelog v1.5:
+ * - Added depth-based wet calibration (Set by Depth option)
+ * - Changed default dry value from 12400 to 11850 (user-calibrated)
+ * - Added depth-to-ADC lookup table (10cm-60cm in water)
+ * - Documented optimal 1000ms warmup time (empirically determined)
  */
 
 #include <Wire.h>
@@ -37,9 +44,9 @@
 // ============================================================================
 
 #define VERSION_MAJOR       1
-#define VERSION_MINOR       4
-#define VERSION_STRING      "1.4"
-#define FIRMWARE_VERSION    ((VERSION_MAJOR << 8) | VERSION_MINOR)  // 0x0104
+#define VERSION_MINOR       5
+#define VERSION_STRING      "1.5"
+#define FIRMWARE_VERSION    ((VERSION_MAJOR << 8) | VERSION_MINOR)  // 0x0105
 
 // ============================================================================
 // PIN DEFINITIONS
@@ -120,7 +127,7 @@ struct Config {
 // Default configuration
 Config config = {
     .logInterval = 15,              // 15 minutes (14 days @ 4 bytes/entry)
-    .sensorDry = 12400,             // Typical 14-bit ADC value in air
+    .sensorDry = 11850,             // Measured 14-bit ADC value in air (user calibrated)
     .sensorWet = 6000,              // Typical 14-bit ADC value in water
     .writePointer = 0,              // Start of buffer
     .totalEntries = 0,              // No entries yet
@@ -129,7 +136,7 @@ Config config = {
 
     // v1.2 defaults
     .backlightTimeout = 1,          // 1 minute
-    .sensorWarmup = 500,            // 500ms (v1.4: DIS control, VCC stable)
+    .sensorWarmup = 1000,           // 1000ms warmup time
     .numMeasurements = 10,          // 10 samples
     .measurementDelay = 100         // 100ms between samples
 };
@@ -170,11 +177,12 @@ enum MenuState {
     SETTING_MEASUREMENT_DELAY,     // Adjust delay between samples (v1.2)
     CALIBRATE_MENU,                // Calibration submenu (Dry/Wet selection)
     CAL_DRY_MENU,          // Dry value submenu (Measure/Edit)
-    CAL_WET_MENU,          // Wet value submenu (Measure/Edit)
+    CAL_WET_MENU,          // Wet value submenu (Measure/Edit/Depth)
     CAL_DRY_MEASURE,       // Measure dry value (in air)
     CAL_WET_MEASURE,       // Measure wet value (in water)
     CAL_DRY_EDIT,          // Edit dry value manually
     CAL_WET_EDIT,          // Edit wet value manually
+    CAL_WET_DEPTH_SELECT,  // Select insertion depth for wet calibration
     CAL_MEASURE_DONE,      // Measurement complete (show result)
     DOWNLOAD_MENU,         // Download data menu
     DOWNLOAD_CONFIRM,      // Confirm download
@@ -190,7 +198,8 @@ uint8_t menuIndex = 0;           // Current menu selection
 uint8_t settingsIndex = 0;       // Settings menu item index
 uint8_t calibrateIndex = 0;      // Calibrate menu item index (0=Dry, 1=Wet)
 uint8_t calDryIndex = 0;         // Dry calibration submenu index (0=Measure, 1=Edit)
-uint8_t calWetIndex = 0;         // Wet calibration submenu index (0=Measure, 1=Edit)
+uint8_t calWetIndex = 0;         // Wet calibration submenu index (0=Measure, 1=Edit, 2=Depth)
+uint8_t depthIndex = 0;          // Depth selection index (0=10cm, 1=20cm, ..., 5=60cm)
 
 // ============================================================================
 // GLOBAL VARIABLES
@@ -464,6 +473,31 @@ uint8_t detectSensorErrors(int rawADC) {
     }
 
     return flags;
+}
+
+// ============================================================================
+// DEPTH-BASED WET CALIBRATION
+// ============================================================================
+
+uint16_t getADCForDepth(uint8_t depthIndex) {
+    // Lookup table: measured ADC values at different insertion depths
+    // Based on user calibration data with sensor dry value of 11850
+    const uint16_t depthTable[6] = {
+        11800,  // 10cm (barely inserted, mostly air)
+        10000,  // 20cm
+        9200,   // 30cm
+        8500,   // 40cm
+        8000,   // 50cm
+        7700    // 60cm (full insertion)
+    };
+
+    if (depthIndex > 5) depthIndex = 5;  // Safety clamp
+    return depthTable[depthIndex];
+}
+
+uint8_t getDepthCm(uint8_t depthIndex) {
+    // Convert index to centimeters (10, 20, 30, 40, 50, 60)
+    return (depthIndex + 1) * 10;
 }
 
 // ============================================================================
@@ -796,7 +830,7 @@ uint8_t calculateChecksum() {
 
 void resetToDefaults() {
     config.logInterval = 15;
-    config.sensorDry = 12400;
+    config.sensorDry = 11850;           // User calibrated dry value
     config.sensorWet = 6000;
     config.writePointer = 0;
     config.totalEntries = 0;
@@ -805,7 +839,7 @@ void resetToDefaults() {
 
     // v1.2 defaults
     config.backlightTimeout = 1;        // 1 minute
-    config.sensorWarmup = 1000;         // 1000ms
+    config.sensorWarmup = 1000;         // 1000ms warmup time
     config.numMeasurements = 10;        // 10 samples
     config.measurementDelay = 100;      // 100ms
 
@@ -904,7 +938,12 @@ void handleUpButton() {
             break;
 
         case CAL_WET_MENU:
-            calWetIndex = (calWetIndex > 0) ? calWetIndex - 1 : 1;
+            calWetIndex = (calWetIndex > 0) ? calWetIndex - 1 : 2;
+            displayMenu();
+            break;
+
+        case CAL_WET_DEPTH_SELECT:
+            depthIndex = (depthIndex > 0) ? depthIndex - 1 : 5;  // 0-5 for 10-60cm
             displayMenu();
             break;
 
@@ -972,7 +1011,12 @@ void handleDownButton() {
             break;
 
         case CAL_WET_MENU:
-            calWetIndex = (calWetIndex < 1) ? calWetIndex + 1 : 0;
+            calWetIndex = (calWetIndex < 2) ? calWetIndex + 1 : 0;
+            displayMenu();
+            break;
+
+        case CAL_WET_DEPTH_SELECT:
+            depthIndex = (depthIndex < 5) ? depthIndex + 1 : 0;  // 0-5 for 10-60cm
             displayMenu();
             break;
 
@@ -1118,7 +1162,20 @@ void handleSelectButton() {
                 config.sensorWet = ((config.sensorWet + 25) / 50) * 50;
                 currentState = CAL_WET_EDIT;
                 displayMenu();
+            } else if (calWetIndex == 2) {
+                // Selected "Set by Depth"
+                currentState = CAL_WET_DEPTH_SELECT;
+                depthIndex = 5;  // Default to 60cm (full insertion)
+                displayMenu();
             }
+            break;
+
+        case CAL_WET_DEPTH_SELECT:
+            // User confirmed depth selection
+            config.sensorWet = getADCForDepth(depthIndex);
+            saveConfig();
+            currentState = CAL_MEASURE_DONE;
+            displayMenu();
             break;
 
         case CAL_DRY_MEASURE:
@@ -1219,6 +1276,7 @@ void handleBackButton() {
 
         case CAL_WET_MEASURE:
         case CAL_WET_EDIT:
+        case CAL_WET_DEPTH_SELECT:
             currentState = CAL_WET_MENU;
             displayMenu();
             break;
@@ -1350,13 +1408,26 @@ void displayMenu() {
 
         case CAL_WET_MENU:
             lcd.setCursor(0, 0);
-            lcd.print(F("WET CALIBRATION"));
+            lcd.print(F("WET CAL ("));
+            lcd.print(calWetIndex + 1);
+            lcd.print(F("/3)"));
             lcd.setCursor(0, 1);
             if (calWetIndex == 0) {
                 lcd.print(F(">Measure Now"));
-            } else {
+            } else if (calWetIndex == 1) {
                 lcd.print(F(">Edit Manually"));
+            } else {
+                lcd.print(F(">Set by Depth"));
             }
+            break;
+
+        case CAL_WET_DEPTH_SELECT:
+            lcd.setCursor(0, 0);
+            lcd.print(F("Insert depth:"));
+            lcd.setCursor(0, 1);
+            lcd.print(getDepthCm(depthIndex));
+            lcd.print(F("cm -> ADC:"));
+            lcd.print(getADCForDepth(depthIndex));
             break;
 
         case CAL_DRY_MEASURE:

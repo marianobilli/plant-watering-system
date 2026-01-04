@@ -1,26 +1,51 @@
-# Soil Humidity Monitor - User Guide
+# Soil Humidity Monitor
 
 **1-Week EEPROM Data Logger for Plant Moisture Analysis**
 
-A simplified monitoring-only variant designed to help you understand your plant's natural watering cycles before implementing automatic irrigation. Logs 672 measurements over 7 days to Arduino UNO R4 WiFi's 8KB EEPROM (v1.2 includes min/max ADC tracking).
+A monitoring-only Arduino system designed to help you understand your plant's natural watering cycles before implementing automatic irrigation. Logs 1,344 measurements over 14 days to Arduino UNO R4 WiFi's 8KB EEPROM.
 
 ---
 
-## Quick Start (5-Minute Setup)
+## Objectives & Purpose
 
-1. **Waterproof sensor** (2 coats clear nail polish, dry 24h)
-2. **Wire components** per schematic (20 connections)
-3. **Upload firmware** via Arduino IDE (30 seconds)
-4. **Calibrate sensor** (Main Menu → Calibrate → Run Wizard)
-   - Watch live ADC values, wait for stabilization, press SELECT
-5. **Insert in soil** → Auto-logging begins!
-   - Status screen shows moisture % and raw ADC value
+### Why this project exists
 
-**After 2 weeks:** Download CSV via Serial Monitor (115200 baud) → Analyze in Excel/Python
+Most DIY automatic watering systems fail not because of hardware issues, but because they use **guessed threshold values** instead of measured data. When should you water? At 20% moisture? 30%? What's your target humidity after watering? 70%? 80%? How long does water take to reach the sensor after you pour it on the soil?
 
-### Key Features (v1.2)
+**Without quantitative data, you're guessing.**
+
+### Problem it solves
+
+This monitoring system solves the fundamental problem of DIY irrigation: **lack of baseline data**. By logging 2 weeks of moisture measurements, you learn:
+
+- Your plant's natural dry-down rate (how fast moisture drops)
+- The moisture level where your plant shows stress (wilting, drooping)
+- How long water takes to propagate through soil to the sensor
+- Optimal watering thresholds for your specific plant + soil combination
+
+### How it fits into the larger project
+
+This monitor is **Phase 1b** of a larger plant watering automation project:
+
+1. **Phase 1a (POC):** Single-plant automatic watering system with pump
+2. **Phase 1b (Monitor):** Simplified data-collection variant **(this project)**
+3. **Phase 2 (Production):** Multi-plant system with ESP32 and cloud connectivity
+
+**Recommended workflow:**
+1. Build **monitor variant** → collect 2 weeks of data
+2. Analyze CSV → determine optimal `minThreshold`, `targetHumidity`, `soakTime`
+3. Upgrade to **POC variant** (add pump + MOSFET circuit)
+4. Configure automatic watering with measured thresholds
+5. Test thoroughly before deploying
+
+See [`../CLAUDE.md`](../CLAUDE.md) for complete project context.
+
+---
+
+## Key Features (v1.5)
 
 - **Real-time ADC monitoring:** Status screen shows both moisture % and raw sensor value
+- **Depth-based wet calibration:** Set wet value by insertion depth (10-60cm) without submerging in water
 - **Configurable sensor parameters:** Warmup time, number of samples, measurement delays
 - **Min/Max ADC tracking:** CSV export includes min/max ADC values for each measurement
 - **Live calibration feedback:** Watch ADC values stabilize during calibration (updates every 0.5s)
@@ -29,865 +54,193 @@ A simplified monitoring-only variant designed to help you understand your plant'
 
 ---
 
-## Table of Contents
+## Quick Start
 
-1. [Hardware Assembly](#hardware-assembly)
-2. [Firmware Upload](#firmware-upload)
-3. [First-Time Setup](#first-time-setup)
-4. [Operating the System](#operating-the-system)
-5. [CSV Download Instructions](#csv-download-instructions)
-6. [Data Analysis Workflow](#data-analysis-workflow)
-7. [Troubleshooting](#troubleshooting)
-8. [Technical Specifications](#technical-specifications)
+**For detailed instructions, see [build.md](build.md) (assembly) and [user_manual.md](user_manual.md) (operation).**
 
----
+### 1. Waterproof Sensor
+Apply 2 coats of clear nail polish to sensor PCB, dry 24 hours.
 
-## Hardware Assembly
+### 2. Wire Components
+Connect sensor, LCD, and 4 buttons per wiring diagram.
+**→ See [build.md](build.md#wiring-diagram) for detailed connections**
 
-### Components Required
+### 3. Upload Firmware
+Install Arduino IDE, board support, and libraries. Upload firmware.
+**→ See [build.md](build.md#firmware-upload) for step-by-step instructions**
 
-See [`BOM_MONITOR.md`](BOM_MONITOR.md) for complete parts list (~$42 USD).
+### 4. Calibrate Sensor
+Run calibration wizard: Main Menu → Calibrate → Measure Now.
+**→ See [user_manual.md](user_manual.md#sensor-calibration-required) for calibration methods**
 
-**Core items:**
-- Arduino UNO R4 WiFi
-- **Capacitive soil moisture sensor** (Cytron MAKER-SOIL-MOISTURE or compatible)
-  - **Manufacturer:** Cytron Technologies
-  - **Model:** MAKER-SOIL-MOISTURE
-  - **Datasheet:** [PDF](https://download.kamami.pl/p1178856-Dokumentacja_MAKER-SOIL-MOISTURE%20Datasheet.pdf)
-  - **Interface:** 4-wire Grove connector (VCC, GND, OUT, DIS)
-  - **Output voltage:** 1.0V - 5.2V (higher = drier soil)
-  - **Supply voltage:** 2.5V - 7.0V
-  - **Note:** Other capacitive sensors may work but require calibration
-- 16×2 I2C LCD display
-- 4× tactile push buttons
-- Breadboard + jumper wires
-- USB-C cable (data + power)
+### 5. Insert in Soil
+Auto-logging begins! Status screen shows moisture % and raw ADC value.
+**→ See [user_manual.md](user_manual.md#operating-the-system) for menu navigation**
 
-### Wiring Diagram
-
-**Pin Connections:**
-
-| Component | Pin | Arduino Pin | Notes |
-|-----------|-----|-------------|-------|
-| **Soil Sensor** | VCC | 5V | Constant power (always on) |
-| | DIS | D2 | Disable control (LOW=enabled, HIGH=disabled) |
-| | OUT | A0 | Analog output (14-bit ADC input) |
-| | GND | GND | Common ground |
-| **16×2 LCD** | VCC | 5V | I2C module |
-| | GND | GND | |
-| | SDA | SDA (A4) | I2C data |
-| | SCL | SCL (A5) | I2C clock |
-| **Button UP** | Pin 1 | D4 | Internal pullup enabled |
-| | Pin 2 | GND | Active LOW |
-| **Button DOWN** | Pin 1 | D5 | Internal pullup |
-| | Pin 2 | GND | |
-| **Button SELECT** | Pin 1 | D6 | Internal pullup |
-| | Pin 2 | GND | |
-| **Button BACK** | Pin 1 | D7 | Internal pullup |
-| | Pin 2 | GND | |
-| **USB Cable** | USB-C | Arduino USB port | Power + Serial data |
-
-**Complete schematic:** See [`kicad/soil_humidity_monitor.kicad_sch`](kicad/soil_humidity_monitor.kicad_sch)
-
-### DIS Pin Control via GPIO
-
-**The DIS pin is now controlled by D2 for power management!**
-
-**How DIS pin control works:**
-- **D2 = LOW (DIS pin LOW):** Sensor enabled, outputs valid voltage (1.0-5.2V)
-- **D2 = HIGH (DIS pin HIGH):** Sensor disabled, output invalid (~0.15V), low power (0.14mA)
-
-**Wiring:**
-```
-Sensor VCC → Arduino 5V (constant power)
-Sensor OUT → Arduino A0 (ADC input)
-Sensor GND → Arduino GND
-Sensor DIS → Arduino D2 (GPIO control)
-```
-
-**Benefits of DIS pin control:**
-- Faster wake-up time (VCC already stable, no capacitor charging)
-- Sensor retains internal state (more consistent readings)
-- Same longevity benefits as GPIO power cycling (0.02% duty cycle)
-- Lower power consumption in sleep (0.14mA vs 0mA, negligible difference)
-
-**Troubleshooting:**
-
-If you see ADC values around **500-600** (instead of 7,000-13,000), the DIS pin may be:
-- Not connected to D2
-- Connected incorrectly (check wiring)
-- D2 pin stuck HIGH (check Arduino functionality)
-
-**Correct wiring checklist:**
-- [ ] Sensor VCC → Arduino 5V (**NOT D2!**)
-- [ ] Sensor DIS → Arduino D2
-- [ ] Sensor OUT → Arduino A0
-- [ ] Sensor GND → Arduino GND
-
-### Assembly Steps
-
-1. **Prepare Sensor (CRITICAL - do this first!):**
-   ```
-   1. Apply clear nail polish to sensor PCB (front + back)
-   2. Avoid coating the metal probes themselves
-   3. Let dry 30 minutes
-   4. Apply second coat
-   5. Let dry 24 hours before use
-   ```
-   **Why?** Waterproofing extends sensor life from 3-6 months to 1-2+ years.
-
-2. **Connect LCD:**
-   - 5V → LCD VCC
-   - GND → LCD GND
-   - SDA (A4) → LCD SDA
-   - SCL (A5) → LCD SCL
-
-3. **Connect Sensor:**
-   - 5V → Sensor VCC (constant power)
-   - D2 → Sensor DIS (disable control)
-   - GND → Sensor GND
-   - A0 → Sensor OUT (analog output)
-
-4. **Connect Buttons:**
-   - D4 → Button UP Pin 1, GND → Button UP Pin 2
-   - D5 → Button DOWN Pin 1, GND → Button DOWN Pin 2
-   - D6 → Button SELECT Pin 1, GND → Button SELECT Pin 2
-   - D7 → Button BACK Pin 1, GND → Button BACK Pin 2
-
-5. **Double-Check:**
-   - [ ] No shorts between 5V and GND
-   - [ ] Sensor powered from D2 (not 5V rail)
-   - [ ] LCD I2C connections not swapped
-   - [ ] All button pins connected to GND
+### 6. Download Data After 2 Weeks
+Connect via USB Serial, download CSV at 115200 baud.
+**→ See [user_manual.md](user_manual.md#csv-download-instructions) for download methods**
 
 ---
 
-## Firmware Upload
+## Practical Lessons Learned
 
-### Prerequisites
+### Optimal Sensor Warmup Time
 
-1. **Install Arduino IDE** (2.0 or newer)
-   - Download: https://www.arduino.cc/en/software
+**Finding:** Through real-world testing, **1000ms warmup time** provides the most accurate and stable readings.
 
-2. **Install Board Support:**
-   - Open Arduino IDE
-   - Tools → Boards Manager → Search "Arduino UNO R4"
-   - Install "Arduino UNO R4 Boards" by Arduino
+**Why this matters:**
+- The sensor's internal circuitry (MCP6002/MCP6004 op-amp) needs time to stabilize after being enabled
+- When VCC is constantly powered and only the DIS pin is toggled, the sensor still requires warmup for the output stage to settle
+- Shorter warmup times (200-500ms) can work but produce less consistent readings
+- Longer warmup times (1500-2000ms) don't improve accuracy further
 
-3. **Install Libraries:**
-   - Sketch → Include Library → Manage Libraries
-   - Search and install:
-     - **LiquidCrystal I2C** by Frank de Brabander (v1.2.2+)
-   - Built-in libraries (no install needed): Wire, EEPROM
+**Default configuration:**
+- Firmware default: **1000ms**
+- User-adjustable via Settings menu: 100-2000ms range
+- Recommended for most applications: Keep at 1000ms
 
-### Upload Steps
+**When to adjust:**
+- **Decrease to 500ms:** If you need faster logging cycles and can tolerate slight noise
+- **Increase to 1500ms:** If readings seem unstable or sensor is in cold environment
 
-1. **Open Firmware:**
-   - File → Open → Navigate to `monitor/src/soil_humidity_monitor.ino`
+### Insertion Depth Impact on Readings
 
-2. **Configure Board:**
-   - Tools → Board → Arduino UNO R4 WiFi
-   - Tools → Port → (select your Arduino's COM port)
+**Finding:** Sensor ADC values change dramatically based on insertion depth in water, even when fully submerged.
 
-3. **Upload:**
-   - Click Upload button (→) or press Ctrl+U
-   - Wait for "Done uploading" message (~30 seconds)
+**Measured data** (Cytron MAKER-SOIL-MOISTURE, dry value = 11,850 ADC):
 
-4. **Verify:**
-   - LCD should display: "Soil Monitor" / "v1.2"
-   - Status screen should appear with "M:--% ADC:0" / "Log:0/672"
-   - Serial Monitor (115200 baud) should show: "Soil Humidity Monitor v1.2"
+| Insertion Depth | ADC Value | ADC Change from Dry | Notes |
+|-----------------|-----------|---------------------|-------|
+| Air (dry baseline) | 11,850 | 0 | 0% moisture (dry calibration) |
+| 10cm (barely inserted) | 11,800 | -50 | Sensor mostly in air |
+| 20cm | 10,000 | -1,850 | Shallow insertion |
+| 30cm | 9,200 | -2,650 | Typical potted plants |
+| 40cm | 8,500 | -3,350 | Deeper pots |
+| 50cm | 8,000 | -3,850 | Deep containers |
+| 60cm (full insertion) | 7,700 | -4,150 | 100% moisture (if used as wet calibration) |
 
-**Troubleshooting Upload Errors:**
-- **Port not found:** Install CH340 USB drivers
-- **Compilation error:** Check Arduino UNO R4 board support installed
-- **Upload timeout:** Press reset button on Arduino, then upload again
+**Key insight:** The ADC value you use for wet calibration becomes your "100% moisture" reference. If you calibrate wet at 60cm (ADC 7,700), then 7,700 = 100% wet. If you calibrate at 30cm (ADC 9,200), then 9,200 = 100% wet for your system.
 
----
+**Why this matters:**
 
-## First-Time Setup
+1. **Calibration consistency:** Your wet calibration must match your actual deployment depth
+   - If you calibrate at 60cm depth (ADC 7,700 = 100% wet) but deploy at 30cm depth (which reads ADC 9,200), you'll see ~40% moisture when the soil is actually at 0% (completely dry)
+   - **Always calibrate at the depth you'll use in soil**
 
-### 1. Initial Boot
+2. **Depth-based calibration feature:** Firmware v1.5+ includes "Set by Depth" option
+   - Navigate: Main Menu → Calibrate → Wet Value → Set by Depth
+   - Select your typical planting depth (10-60cm)
+   - System automatically sets appropriate wet ADC value
+   - No need to physically submerge sensor in water
 
-LCD displays:
-```
-Soil Monitor
-v1.2
-```
+3. **Physical explanation:**
+   - Capacitive sensors measure the dielectric constant of material between the sensing plates
+   - More surface area in water = higher capacitance = lower ADC reading
+   - At 10cm insertion, most of the sensor is still in air (minimal capacitance change)
+   - At 60cm insertion, entire sensing area is submerged (maximum capacitance change)
 
-Then automatically shows **Status Screen**:
-```
-M:--% ADC:0
-Log:0/672
-```
+4. **Soil vs water calibration:**
+   - Water gives more consistent readings than saturated soil
+   - Soil contains air pockets (reduces effective moisture)
+   - For most accurate calibration: use water at your deployment depth
+   - For field calibration: use fully saturated soil (packed, no air gaps)
 
-**Note:** Moisture shows "--%" and ADC shows 0 until first sensor reading is taken (after calibration).
+**Best practices:**
 
-### 2. Sensor Calibration (REQUIRED)
+- ✅ **Measure dry value once** with sensor completely in air (this doesn't change with depth)
+- ✅ **Measure wet value at your deployment depth** (20-40cm typical for potted plants)
+- ✅ **Insert sensor to the same depth every time** you move it
+- ✅ **Use the "Set by Depth" feature** if you don't have water deep enough for full immersion
+- ❌ **Don't calibrate at 60cm and deploy at 20cm** (40% moisture error!)
+- ❌ **Don't submerge past the white PCB line** (damages electronics)
 
-**Why?** Each sensor has different ADC values for dry/wet conditions. Calibration ensures accurate 0-100% readings.
+**Example scenario:**
 
-**The new calibration menu allows you to calibrate dry and wet values independently**, with both automatic (measured) and manual (edited) options for each.
-
-**Method 1: Automatic Measurement (Recommended)**
-
-Navigate to: Main Menu → Calibrate → Choose Dry or Wet → Measure Now
-
-**For Dry Calibration:**
-1. Main Menu → Calibrate → ">Dry Value" → SELECT
-2. Select ">Measure Now" → SELECT
-3. Display shows: "Hold in AIR" / "ADC:XXXXX SEL=OK"
-4. Hold sensor in open air (not touching anything)
-5. **Watch ADC value update every 0.5 seconds** (live reading)
-6. Wait until value stabilizes (stops changing)
-7. Press SELECT to capture dry value
-8. Display shows: "Saved! D:XXXXX W:XXXXX" → Press SELECT
-9. Typical dry value: 10,000-13,000 (14-bit ADC)
-
-**For Wet Calibration:**
-1. Main Menu → Calibrate → ">Wet Value" → SELECT
-2. Select ">Measure Now" → SELECT
-3. Display shows: "Wet soil/water" / "ADC:XXXXX SEL=OK"
-4. Submerge sensor probes in glass of water (don't submerge entire PCB!)
-5. **Watch ADC value update every 0.5 seconds** (live reading)
-6. Wait until value stabilizes (usually 2-3 seconds)
-7. Press SELECT to capture wet value
-8. Display shows: "Saved! D:XXXXX W:XXXXX" → Press SELECT
-9. Typical wet value: 7,500-9,000 (14-bit ADC)
-
-**Method 2: Manual Edit (Advanced)**
-
-Navigate to: Main Menu → Calibrate → Choose Dry or Wet → Edit Manually
-
-**To edit dry value:**
-1. Main Menu → Calibrate → ">Dry Value" → SELECT
-2. Select ">Edit Manually" → SELECT
-3. Display shows: "Dry (air) ADC" / "12400 UP/DN SEL"
-4. Use UP/DOWN buttons to adjust (±50 per press)
-   - **Note:** Value automatically rounds to nearest multiple of 50
-   - Example: 11332 → rounds to 11350 → UP → 11400 → UP → 11450
-5. Press SELECT to save
-6. Display shows: "Saved! D:XXXXX W:XXXXX" → Press SELECT
-7. Returns to Calibrate menu
-
-**To edit wet value:**
-1. Main Menu → Calibrate → ">Wet Value" → SELECT
-2. Select ">Edit Manually" → SELECT
-3. Display shows: "Wet (water) ADC" / "6000 UP/DN SEL"
-4. Use UP/DOWN buttons to adjust (±50 per press)
-   - **Note:** Value automatically rounds to nearest multiple of 50
-   - Example: 9124 → rounds to 9100 → DOWN → 9050 → DOWN → 9000
-5. Press SELECT to save
-6. Display shows: "Saved! D:XXXXX W:XXXXX" → Press SELECT
-7. Returns to Calibrate menu
-
-**Benefits of independent calibration:**
-- Recalibrate only dry OR wet without redoing both
-- Test different dry calibration values without changing wet
-- Fine-tune one value while keeping the other
-- Faster workflow when you only need to adjust one value
-
-**Calibration values persist through power cycles** - you only need to do this once!
-
-**Viewing Calibration Values:**
-- Main Menu → System Info shows current dry/wet ADC values
-- Status screen always displays live raw ADC reading
-
-### 3. Adjust Log Interval (Optional)
-
-Default: 15 minutes (optimal for 14-day storage)
-
-**To change:**
-
-1. Main Menu → 1. Settings
-2. Press SELECT
-3. Display shows: "Log Interval: 15 min"
-4. Use UP/DOWN buttons to adjust (1-60 minutes)
-5. Press SELECT to save
-6. Press BACK to exit
-
-**Storage duration based on interval:**
-
-| Interval | Duration | Use Case |
-|----------|----------|----------|
-| 10 min | 9.3 days | Fast data collection |
-| 15 min | 14.0 days | **Default (optimal)** |
-| 30 min | 28.0 days | Long-term trends |
-| 60 min | 56.0 days | Extended monitoring |
+You're monitoring a plant with sensor inserted **30cm deep**:
+1. Calibrate dry: Hold in air → 11,850 ADC (standard)
+2. Calibrate wet (Option A): Submerge to 30cm in water → 9,200 ADC
+3. Calibrate wet (Option B): Main Menu → Calibrate → Wet → Set by Depth → 30cm
+4. System now correctly maps: 11,850 (0% dry) to 9,200 (100% wet)
+5. Moisture readings will be accurate for your 30cm deployment depth
 
 ---
 
-## Operating the System
+## Technical Specifications (Overview)
 
-### Status Screen (Default View)
+**For detailed hardware specs, see [build.md](build.md#technical-specifications-hardware).**
+**For operational specs, see [user_manual.md](user_manual.md#technical-specifications-operational).**
 
-**What you see:**
-```
-M:75% ADC:7500
-Log:456/672
-```
+### Core Specifications
 
-**Line 1:** Current moisture and raw sensor value
-- **M:XX%** - Calibrated soil moisture (0-100%)
-- **ADC:XXXXX** - Raw 14-bit ADC reading (0-16383)
-- Updates every 2 seconds when backlight is on
-- Shows "--%" before first calibration
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| **Platform** | Arduino UNO R4 WiFi | Renesas RA4M1, 14-bit ADC, 8KB EEPROM |
+| **Storage Capacity** | 1,344 entries | 5,376 bytes EEPROM (4 bytes/entry) |
+| **Storage Duration** | 14.0 days @ 15-min | User-adjustable 1-60 min intervals |
+| **ADC Resolution** | 14-bit (0-16383) | Higher resolution than classic Arduino (10-bit) |
+| **Sensor Type** | Capacitive | Cytron MAKER-SOIL-MOISTURE recommended |
+| **Sensor Duty Cycle** | 0.02% | Extends sensor life from 3-6 months to 1-2+ years |
+| **Power** | USB 5V | ~40mA active, ~25mA idle |
+| **Cost** | ~$42 USD | See [`BOM_MONITOR.md`](BOM_MONITOR.md) for parts list |
 
-**Line 2:** Logged entries / total capacity
-- Example: "456/672" = 456 readings stored, 672 max
-- When full, oldest entries are automatically overwritten (circular buffer)
-- **!** appears when buffer >90% full (warning to download data)
+### Storage Duration by Interval
 
-### Navigation Controls
+| Interval | Entries | Duration | Use Case |
+|----------|---------|----------|----------|
+| 10 min | 1,344 | 9.3 days | Fast data collection |
+| **15 min** | **1,344** | **14.0 days** | **Default (optimal)** |
+| 30 min | 1,344 | 28.0 days | Long-term trends |
+| 60 min | 1,344 | 56.0 days | Extended monitoring |
 
-| Button | Action |
-|--------|--------|
-| **UP** | Move up in menu / Increase value |
-| **DOWN** | Move down in menu / Decrease value |
-| **SELECT** | Enter menu / Confirm action |
-| **BACK** | Exit menu / Cancel action |
+### Data Export Format
 
-**Backlight behavior:**
-- Turns on when any button pressed
-- Stays on for 1 minute
-- Auto-sleeps to save power
-- Data logging continues in background
-
-### Menu Structure
-
-```
-STATUS SCREEN (default view: M:XX% ADC:XXXXX / Log:XXX/672)
-│
-SELECT → MAIN MENU
-         ├── Settings
-         │   └── Log Interval
-         │       └── Adjust 1-60 min (UP/DOWN) → SELECT saves
-         │
-         ├── Calibrate
-         │   ├── Dry Value
-         │   │   ├── Measure Now (automatic - hold sensor in air)
-         │   │   │   └── Hold in AIR (live ADC display) → SELECT captures → Saved!
-         │   │   └── Edit Manually (manual adjustment)
-         │   │       └── 12400 UP/DN SEL (±50 increments) → SELECT saves
-         │   └── Wet Value
-         │       ├── Measure Now (automatic - put sensor in water)
-         │       │   └── Wet soil/water (live ADC display) → SELECT captures → Saved!
-         │       └── Edit Manually (manual adjustment)
-         │           └── 6000 UP/DN SEL (±50 increments) → SELECT saves
-         │
-         ├── Download Data
-         │   ├── "Download CSV?" → SELECT=Yes
-         │   ├── Progress bar [####----] XX%
-         │   └── "Download done! XXX entries"
-         │
-         ├── Clear Data
-         │   └── "Clear all data?" → SELECT=Yes BCK=No
-         │
-         ├── System Info
-         │   └── Cal D:12400 / W:6000 Int:15m
-         │
-         └── Reset to Defaults
-             └── "Reset config?" → SELECT=Yes BCK=No
-```
-
-### Automatic Logging
-
-**How it works:**
-- Every 15 minutes (or your configured interval), the system:
-  1. Enables sensor (D2 = LOW, DIS pin enabled)
-  2. Waits 500ms for warmup (configurable via Settings)
-  3. Takes 10 ADC readings (median calculation, reduces noise)
-  4. Disables sensor (D2 = HIGH, DIS pin disabled)
-  5. Converts to 0-100% using calibration
-  6. Writes 4-byte entry to EEPROM
-  7. Updates entry counter
-
-**No user action required** - logging happens automatically in background.
-
-**Entry count updates:**
-- Status screen shows current count
-- When reaching 1,344 entries (capacity), oldest entries overwrite automatically
-- Entry count freezes at 1,344 when buffer is full
-
----
-
-## CSV Download Instructions
-
-### Method 1: Arduino IDE Serial Monitor (Easiest)
-
-1. **Connect Arduino** via USB cable to computer
-
-2. **Open Serial Monitor:**
-   - Arduino IDE → Tools → Serial Monitor
-   - Set baud rate: **115200** (bottom-right dropdown)
-   - Set line ending: "Newline" or "Both NL & CR"
-
-3. **Start Download on Arduino:**
-   - Press SELECT (enter Main Menu)
-   - Navigate: DOWN → DOWN → "3. Download Data"
-   - Press SELECT
-   - Display shows: "Ready to download?" / "SELECT=Yes BACK=No"
-   - Press SELECT to confirm
-
-4. **Monitor Progress:**
-   - Serial Monitor shows metadata header
-   - CSV data rows stream (Entry, Timestamp, Moisture%, etc.)
-   - LCD shows progress bar: "Downloading... [####----] 50%"
-   - Takes ~60-120 seconds for 1,344 entries
-
-5. **Save CSV File:**
-   - When complete, Serial Monitor shows: "# End of data export"
-   - Select all text in Serial Monitor (Ctrl+A)
-   - Copy (Ctrl+C)
-   - Paste into text editor
-   - Save as `moisture_data.csv`
-
-### Method 2: Command-Line Serial (Advanced)
-
-**Linux/Mac:**
-```bash
-# Find Arduino port
-ls /dev/tty.* | grep usb
-
-# Start serial capture
-screen /dev/tty.usbserial-XXXXXX 115200 > moisture_data.csv
-
-# On Arduino: Main Menu → Download Data → SELECT
-# Wait for download to complete
-# Stop capture: Ctrl+A, then K, then Y
-```
-
-**Windows (PowerShell):**
-```powershell
-# Open serial port
-$port = new-Object System.IO.Ports.SerialPort COM3,115200,None,8,One
-$port.Open()
-
-# On Arduino: Main Menu → Download Data → SELECT
-
-# Read data to file
-$data = $port.ReadLine()
-$data | Out-File -FilePath moisture_data.csv -Append
-
-# Close port when done
-$port.Close()
-```
-
-### CSV Format
-
-**Example output:**
-```csv
-# Soil Humidity Monitor Data Export
-# Firmware Version: 1.3
-# Total Entries: 1234
-# Log Interval: 15 minutes
-# Sensor Calibration: Dry=12400, Wet=6000
-# Buffer Status: NOT_WRAPPED
-#
-Entry,Timestamp_Hours,Timestamp_Minutes,Moisture_%,Median_ADC,Flags
-1,0.00,0,45,8500,0x00
-2,0.25,15,46,8450,0x00
-3,0.50,30,47,8400,0x00
-...
-1234,308.25,18495,52,7800,0x00
-```
-
-**Columns:**
+CSV file via USB Serial (115200 baud) with columns:
 - **Entry:** Sequential number (1-1344)
 - **Timestamp_Hours:** Hours since monitoring started
 - **Timestamp_Minutes:** Total minutes since start
 - **Moisture_%:** Calibrated moisture (0-100%)
-- **Median_ADC:** Median 14-bit ADC value from 10 samples (0-16383)
-- **Flags:** Status bits (0x00 = normal, 0x01 = sensor error)
-
-**Note:** Min/Max ADC values are displayed in live Serial Monitor output during logging but not stored in EEPROM or CSV export (v1.3+ memory optimization).
+- **Median_ADC:** Median 14-bit ADC value from 10 samples
+- **Flags:** Status bits (sensor error, out of range)
 
 ---
 
-## Data Analysis Workflow
-
-### Step 1: Import CSV to Excel
-
-1. Open Excel
-2. Data → From Text/CSV
-3. Select `moisture_data.csv`
-4. Delimiter: Comma
-5. Click Load
-
-**Skip comment lines** (lines starting with `#`) or delete them manually.
-
-### Step 2: Create Charts
-
-**Time-Series Plot:**
-- X-axis: `Timestamp_Hours` or `Timestamp_Minutes`
-- Y-axis: `Moisture_%`
-- Chart type: Scatter with smooth lines
-
-**What to look for:**
-- **Dry-down rate:** How fast moisture drops naturally
-- **Watering events:** Sharp increases (if manually watered)
-- **Stabilization level:** Where moisture settles after watering
-- **Daily patterns:** Does moisture change with temperature/sunlight?
-
-### Step 3: Calculate Key Metrics
-
-**Natural Dry-Down Rate:**
-```
-Rate = (Moisture_start - Moisture_end) / Time_hours
-Example: (80% - 30%) / 120 hours = 0.42% per hour
-```
-
-**Optimal Watering Threshold:**
-- Find moisture level where plant shows stress (wilting)
-- Water before reaching this point
-- Typical range: 10-30% depending on plant species
-
-**Moisture Propagation Time:**
-- How long after watering does sensor see moisture increase?
-- Typical: 5-15 minutes (depends on soil type, water amount)
-
-### Step 4: Configure Automatic Watering
-
-Use insights to configure POC automatic watering system:
-
-1. **Set Min Threshold:** 5-10% above stress point
-   - Example: Plant wilts at 15% → Set `minThreshold = 20%`
-
-2. **Set Target Humidity:** Peak moisture after manual watering
-   - Example: Manual watering reaches 75% → Set `targetHumidity = 75%`
-
-3. **Set Soak Time:** Moisture propagation time + buffer
-   - Example: Sensor updates in 8 minutes → Set `soakTime = 10 minutes`
-
-4. **Set Check Interval:** 2-3× natural dry-down period
-   - Example: Dries from 80% → 30% in 5 days → Check moisture every 12 hours
-
-### Example Analysis (Python)
-
-```python
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# Load CSV
-df = pd.read_csv('moisture_data.csv', comment='#')
-
-# Plot time series
-plt.figure(figsize=(12, 6))
-plt.plot(df['Timestamp_Hours'], df['Moisture_%'], linewidth=1)
-plt.xlabel('Time (hours)')
-plt.ylabel('Soil Moisture (%)')
-plt.title('1-Week Soil Moisture Monitoring')
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.savefig('moisture_trend.png', dpi=300)
-plt.show()
-
-# Calculate dry-down rate (linear regression)
-from scipy.stats import linregress
-slope, intercept, r_value, p_value, std_err = linregress(
-    df['Timestamp_Hours'], df['Moisture_%']
-)
-print(f"Dry-down rate: {slope:.3f}% per hour")
-print(f"R²: {r_value**2:.3f}")
-
-# Find minimum moisture
-min_moisture = df['Moisture_%'].min()
-min_timestamp = df.loc[df['Moisture_%'].idxmin(), 'Timestamp_Hours']
-print(f"Minimum moisture: {min_moisture}% at {min_timestamp:.1f} hours")
-```
-
----
-
-## Troubleshooting
-
-### Sensor Issues
-
-**Problem:** Moisture reads 0% or 100% constantly
-- **Cause:** Sensor not calibrated, incorrect calibration values, or **DIS pin not connected to D2**
-- **Fix:**
-  1. **FIRST: Check DIS pin connection!** If ADC reads 500-600, DIS pin wiring is incorrect
-     - Verify DIS wire: Sensor DIS → Arduino D2 (**NOT GND!**)
-     - Verify VCC wire: Sensor VCC → Arduino 5V (**NOT D2!**)
-     - After correct wiring, ADC should read 7,000-13,000
-  2. Check raw ADC value on status screen (should be 7,000-13,000 range for Cytron sensor)
-  3. Run calibration wizard: Main Menu → Calibrate → Run Wizard
-  4. Watch live ADC during calibration to ensure values stabilize
-  5. Verify calibration: Main Menu → System Info (check Dry/Wet values)
-
-**Problem:** Moisture fluctuates wildly (e.g., 20% → 80% → 30%)
-- **Cause:** Poor electrical contact or sensor corrosion
-- **Fix:**
-  1. Check sensor wiring (AOUT to A0)
-  2. Clean sensor probes with rubbing alcohol
-  3. Re-waterproof if coating damaged
-  4. Replace sensor if corroded
-
-**Problem:** Moisture doesn't change when watering plant
-- **Cause:** Sensor positioned in air pocket or outside water flow path
-- **Fix:** Reposition sensor closer to roots, ensure soil contact
-
-**Problem:** ADC values very low (500-600 instead of 7,000-13,000)
-- **Cause:** **DIS pin stuck HIGH or not connected to D2** - sensor is disabled!
-- **Symptoms:**
-  - Status screen shows ADC:500-600 (instead of 7,000-13,000)
-  - Moisture stuck at 100% even when sensor is in air
-  - Calibration gives values like Dry=560, Wet=541 (completely wrong)
-- **Fix:**
-  1. **Connect Sensor DIS pin to Arduino D2** (critical!)
-  2. **Connect Sensor VCC to Arduino 5V** (NOT D2!)
-  3. Power cycle Arduino
-  4. Check status screen - ADC should now read 10,000-13,000 in air
-  5. Put sensor in water - ADC should drop to 7,000-9,000
-  6. Re-run calibration wizard with correct ADC values
-- **Why this happens:** The DIS pin controls sensor enable/disable. D2 must pulse LOW during readings. If DIS is not connected to D2 or D2 is stuck HIGH, sensor outputs ~0.15V (invalid).
-- **Migration note:** If upgrading from v1.0-1.3, you must rewire: VCC from D2→5V, DIS from GND→D2.
-
-**Problem:** Calibration wizard shows unstable ADC values (constantly jumping)
-- **Cause:** Electrical noise, poor sensor contact, or failing sensor
-- **Fix:**
-  1. Check sensor wiring connections (especially 5V, D2, A0, and **DIS to D2**)
-  2. Ensure sensor is not near electrical interference (motors, WiFi routers)
-  3. Try averaging: wait 5-10 seconds, watch for pattern in fluctuation
-  4. If sensor physically damaged, replace it
-
-**Problem:** Need to copy calibration values from another sensor
-- **Cause:** Want to replicate working calibration without physical access
-- **Fix:**
-  1. Note down working sensor's values from System Info
-  2. Main Menu → Calibrate → Edit Values
-  3. Manually enter Dry and Wet ADC values
-  4. Verify on status screen that moisture % looks reasonable
-
-### EEPROM / Logging Issues
-
-**Problem:** Entry count stuck at 0
-- **Cause:** Logging interval expired but not saving entries
-- **Fix:**
-  1. Check System Info → verify interval not set to 0
-  2. Reset to defaults: Main Menu → Reset to Defaults
-  3. Recalibrate sensor
-
-**Problem:** CSV download shows garbage data
-- **Cause:** EEPROM corruption (rare) or wrong baud rate
-- **Fix:**
-  1. Verify Serial Monitor baud = **115200**
-  2. Clear data: Main Menu → Clear Data
-  3. Re-upload firmware if persists
-
-**Problem:** "Buffer wrapped" but fewer than 1,344 entries
-- **Cause:** Write pointer advanced incorrectly (firmware bug)
-- **Fix:** Clear data and restart monitoring session
-
-### LCD Display Issues
-
-**Problem:** LCD shows nothing (blank screen)
-- **Cause:** I2C address mismatch or wiring error
-- **Fix:**
-  1. Check LCD power (5V + GND)
-  2. Verify SDA/SCL not swapped
-  3. Try alternate I2C address: Change line 36 in `.ino`:
-     ```cpp
-     LiquidCrystal_I2C lcd(0x3F, 16, 2);  // Try 0x3F instead of 0x27
-     ```
-  4. Run I2C scanner sketch to detect address
-
-**Problem:** LCD shows garbled characters
-- **Cause:** Loose I2C connection or voltage issue
-- **Fix:**
-  1. Re-seat I2C jumper wires
-  2. Verify 5V power (not 3.3V)
-  3. Check common ground connection
-
-**Problem:** Backlight stays on forever
-- **Cause:** Expected behavior if buttons pressed within 1-minute window
-- **Fix:** Wait 1 minute without pressing buttons → auto-sleeps
-
-### Button Issues
-
-**Problem:** Buttons don't respond
-- **Cause:** Wiring error or wrong internal pullup configuration
-- **Fix:**
-  1. Verify button pin 1 to Arduino, pin 2 to GND
-  2. Check firmware lines 180-183 (internal pullups enabled)
-  3. Test with multimeter: button pressed = LOW (0V)
-
-**Problem:** Single button press registers multiple times
-- **Cause:** Electrical noise or debounce timing too short
-- **Fix:** Firmware handles debouncing (50ms delay) - if persists, add 0.1µF capacitor across button pins
-
-### CSV Download Issues
-
-**Problem:** Serial Monitor shows no output
-- **Cause:** Wrong baud rate or Arduino not connected
-- **Fix:**
-  1. Set Serial Monitor baud = **115200** (bottom-right dropdown)
-  2. Verify USB cable is data cable (not charge-only)
-  3. Check Arduino IDE → Tools → Port shows Arduino
-
-**Problem:** Download hangs at X%
-- **Cause:** Serial buffer overflow (rare on UNO R4)
-- **Fix:**
-  1. Close other serial programs using same port
-  2. Try slower download (increase delay in firmware line 740)
-  3. Use command-line serial capture instead of Arduino IDE
-
----
-
-## Technical Specifications
-
-### System Specifications
-
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| **Storage Capacity** | 1,344 entries | 5,376 bytes EEPROM |
-| **Storage Duration** | 14 days @ 15-min | User-adjustable 1-60 min |
-| **Entry Size** | 4 bytes | Moisture%, Median ADC, flags |
-| **Configuration Size** | 32 bytes | Calibration, settings, pointers |
-| **Unused EEPROM** | 2,784 bytes | Reserved for future features |
-| **Buffer Type** | Circular | Auto-overwrites oldest entries |
-| **ADC Resolution** | 14-bit (0-16383) | Arduino UNO R4 WiFi |
-| **Sensor Power Duty Cycle** | 0.02% | Extends sensor life 4-8× |
-| **Display Update Rate** | 2 seconds | When backlight active |
-| **Backlight Timeout** | 1 minute | Auto-sleep to save power |
-| **CSV Download Time** | 60-120 seconds | For 1,344 entries @ 115200 baud |
-
-### EEPROM Endurance
-
-- **Write Cycles:** 100,000 per address (Arduino UNO R4 WiFi spec)
-- **Writes Per Day:** 96 entries (@ 15-min intervals)
-- **Lifespan:** ~2,850 days (~7.8 years) per address rotation
-- **Circular Buffer:** Each address written once every 14 days
-- **Effective Lifespan:** 79,200 years (not a concern)
-
-**Configuration header** (32 bytes) written only when user changes settings (~5 times over lifetime).
-
-### Power Consumption
-
-| Mode | Current | Notes |
-|------|---------|-------|
-| Active (logging) | ~40 mA | Sensor powered, LCD on |
-| Idle (backlight off) | ~25 mA | Sensor off, LCD on |
-| Sleep (future) | ~10 mA | Deep sleep between logs |
-
-**USB-powered:** No external power supply needed (unlike POC variant with pump).
-
-### Sensor Specifications (Cytron MAKER-SOIL-MOISTURE)
-
-**Official Sensor Specs:**
-- **Model:** Cytron MAKER-SOIL-MOISTURE
-- **Datasheet:** [PDF](https://download.kamami.pl/p1178856-Dokumentacja_MAKER-SOIL-MOISTURE%20Datasheet.pdf)
-- **Op-Amp Chip:** MCP6002 (dual) or MCP6004 (quad) - both variants work identically
-- **Supply voltage:** 2.5V - 7.0V (5V nominal)
-- **Output voltage:** 1.0V - 5.2V (higher = drier soil)
-- **Current consumption:** 3.6mA @ 5V (active), 0.14mA (disabled via DIS pin)
-- **Interface:** 4-wire Grove (VCC, GND, OUT, DIS)
-- **Disable pin (DIS):** Active HIGH (pull LOW to enable sensor)
-
-**Expected ADC Readings (14-bit, 5V supply):**
-
-| Parameter | Voltage | ADC Value (14-bit) | Notes |
-|-----------|---------|-------------------|-------|
-| **Dry (air)** | 3.1-3.6V | 10,164-11,803 | Red LED on sensor |
-| **Moist (typical soil)** | 2.7-3.1V | 8,852-10,164 | Green LED on sensor |
-| **Wet (water)** | 2.3-2.7V | 7,540-8,852 | Blue LED on sensor |
-| **Minimum output** | 1.0V | 3,277 | Fully saturated |
-| **Maximum output** | 5.2V | 17,039 (clipped to 16,383) | Completely dry |
-
-**Typical calibration values:**
-- **Dry ADC (air):** 11,000-13,000
-- **Wet ADC (water):** 7,500-9,000
-- **Calibration range:** 3,000-6,000 ADC units
-
-**Operational Characteristics:**
-
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| ADC Resolution | 14-bit | 0-16,383 (Arduino UNO R4 WiFi) |
-| Warmup Time | 1000 ms | Before reading |
-| Reading Time | 1000 ms | 10 samples × 100ms averaged |
-| Power-On Duration | 2000 ms total | Per 15-min logging cycle |
-| Duty Cycle | 0.04% | Extends sensor life 4-8× |
-| Lifespan (continuous) | 3-6 months | Without DIS pin control |
-| Lifespan (DIS-controlled) | 1-2 years | With waterproofing + duty cycling |
-
-**Common Issues:**
-
-| Symptom | Cause | Solution |
-|---------|-------|----------|
-| ADC reads 500-600 | DIS pin not connected to D2 | Connect DIS → D2, VCC → 5V |
-| Moisture always 100% | ADC below wet calibration value | Check DIS wiring, re-calibrate |
-| Moisture always 0% | ADC above dry calibration value | Re-calibrate sensor |
-| Unstable readings | Poor wiring or corrosion | Check connections, clean sensor |
-
----
-
-## Maintenance & Cleaning
-
-### Regular Maintenance (Weekly)
-
-- **Visual check:** Verify LCD displays current moisture
-- **Entry count:** Check status screen, ensure logging continues
-- **Sensor position:** Verify sensor hasn't shifted out of soil
-
-### After Each Session (2-4 weeks)
-
-1. **Download data** (backup before clearing)
-2. **Clear EEPROM:** Main Menu → Clear Data
-3. **Clean sensor:**
-   - Remove from soil
-   - Rinse with water
-   - Wipe with soft cloth
-   - Check waterproofing (re-coat if damaged)
-4. **Restart monitoring** (or switch to POC automatic watering)
-
-### Long-Term Storage
-
-- **Remove sensor from soil** (prevents corrosion)
-- **Disconnect USB power**
-- **Store in dry location**
-- **Configuration persists** - no need to recalibrate after storage
-
----
-
-## Next Steps
-
-### After 1-Week Monitoring
-
-You now have quantitative data about your plant's watering needs!
-
-**What to do with your data:**
-
-1. **Analyze CSV data** (see Data Analysis Workflow above)
-   - Calculate natural dry-down rate
-   - Identify optimal moisture range for your plant
-   - Determine how long soil stays moist after watering
-
-2. **Improve your watering routine:**
-   - Water when moisture drops to calculated threshold (e.g., 20%)
-   - Water until reaching optimal peak moisture (e.g., 75%)
-   - Adjust watering frequency based on observed dry-down patterns
-
-3. **Continue monitoring:**
-   - Download data periodically (every 2 weeks)
-   - Clear buffer and restart monitoring
-   - Compare seasonal changes in water consumption
-   - Track how different environmental conditions affect moisture
-
-4. **Use insights for decision-making:**
-   - Understand when plants need water while on vacation
-   - Detect if drainage is poor (moisture stays high too long)
-   - Identify if watering too frequently (moisture never drops)
-   - Optimize watering schedule for plant health
+## Project Structure
+
+### Documentation Files
+
+| File | Purpose |
+|------|---------|
+| **[README.md](README.md)** | **This file** - Project overview, objectives, lessons learned |
+| **[build.md](build.md)** | Assembly guide for hobbyists (BOM, wiring, firmware upload) |
+| **[user_manual.md](user_manual.md)** | Operation guide (setup, calibration, data download, analysis) |
+| **[BOM_MONITOR.md](BOM_MONITOR.md)** | Complete parts list with supplier links (~$42 USD) |
+| **[CHANGELOG.md](CHANGELOG.md)** | Version history and release notes |
+
+### Source Files
+
+| Path | Description |
+|------|-------------|
+| `src/soil_humidity_monitor/soil_humidity_monitor.ino` | Main firmware (~900 lines) |
+| `kicad/soil_humidity_monitor.kicad_sch` | KiCad schematic (s-expression format) |
+| `kicad/schematic.png` | Schematic diagram (visual reference) |
+
+### Parent Project
+
+This monitoring variant is part of a larger plant watering automation project:
+- **Parent project:** [`../CLAUDE.md`](../CLAUDE.md) - Complete project overview
+- **POC variant:** [`../poc/`](../poc/) - Automatic watering system with pump
+- **Project README:** [`../README.md`](../README.md) - Top-level project documentation
 
 ---
 
 ## Support & Feedback
 
-- **Issues:** Report bugs at project repository
-- **Firmware version:** Check Main Menu → System Info
-- **Changelog:** See [`CHANGELOG.md`](CHANGELOG.md)
-- **Schematic:** See [`kicad/soil_humidity_monitor.kicad_sch`](kicad/soil_humidity_monitor.kicad_sch)
-- **BOM:** See [`BOM_MONITOR.md`](BOM_MONITOR.md)
-- **Project overview:** See [`../CLAUDE.md`](../CLAUDE.md)
+- **Build questions:** See [build.md](build.md#troubleshooting-hardware--assembly)
+- **Operation questions:** See [user_manual.md](user_manual.md#troubleshooting-operational-issues)
+- **Firmware version:** Check Main Menu → System Info (should show v1.5)
+- **Changelog:** See [`CHANGELOG.md`](CHANGELOG.md) for version history
+- **Report issues:** See project repository
+- **Hardware schematic:** See [`kicad/schematic.png`](kicad/schematic.png) or [`kicad/soil_humidity_monitor.kicad_sch`](kicad/soil_humidity_monitor.kicad_sch)
 
-**Current firmware version:** v1.2 (stable)
+**Current firmware version:** v1.5 (stable)
