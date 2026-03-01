@@ -1,179 +1,77 @@
 # DIY Plant Watering System
 
-> An intelligent, research-based automated plant watering system designed to avoid common DIY mistakes. Features dry cycle logic, moisture propagation timing, and remote monitoring.
+> Automated single-plant watering on Arduino UNO R4 WiFi — dry-cycle logic, incremental dosing, 14-bit ADC, EEPROM logging, and a full LCD menu with calibration wizard.
 
-[![Project Status](https://img.shields.io/badge/Status-POC_Phase-yellow)]()
-[![Hardware](https://img.shields.io/badge/Hardware-Arduino_UNO_R4-blue)]()
-[![License](https://img.shields.io/badge/License-MIT-green)]()
-
----
-
-## 📋 Overview
-
-This project implements lessons learned from dozens of DIY plant watering projects across the maker community. Built in two phases: **POC (single plant)** → **Production (6 plants with cloud + mobile app)**.
-
-### Key Improvements Over Typical DIY Systems
-
-- **Capacitive sensors** (not resistive) with proper waterproofing → prevents corrosion failure
-- **GPIO-powered sensors** → extends sensor life from months to years
-- **Dry cycle logic** → prevents constant watering, allows natural soil drying
-- **Soak time** → waits for moisture propagation before re-checking (prevents over-watering)
-- **Failsafe mechanisms** → water level monitoring, post-watering verification
-- **Explicit WiFi reconnection** → prevents "worked for a week then went offline" failures
-- **Peristaltic pumps** → precise dosing, safe to run dry
-
-📚 **Research:** [lessons_learned.md](lessons_learned.md)
-
-## 🚀 Project Status
-
-### ✅ Phase 1: Proof of Concept (POC) - **Current Phase**
-
-Single plant system using Arduino UNO R4 WiFi, 16×2 LCD menu, breadboard assembly. Validates all watering logic before scaling to 6 plants.
-
-**Hardware:** Arduino UNO R4 WiFi • Cytron capacitive sensor (MCP6004) • 12V peristaltic pump • IRLZ44N MOSFET • 16×2 I2C LCD • 4 buttons
-
-**Status:** ✅ Firmware complete and ready to upload
-
-| Documentation | Description |
-|--------------|-------------|
-| [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) | Complete specifications, dry cycle logic, watering algorithm |
-| [BOM_POC.md](BOM_POC.md) | Parts list with links (Allegro.pl/Botland.pl) • ~550 PLN total |
-| [WIRING_POC.md](WIRING_POC.md) | Pin assignments, MOSFET circuit, sensor wiring |
-| [MENU_DESIGN.md](MENU_DESIGN.md) | Complete 16×2 LCD menu system and navigation |
-| [src/poc/](src/poc/) | **Arduino firmware** with upload guide and usage instructions |
+[![Status](https://img.shields.io/badge/status-active-brightgreen)]()
+[![Firmware](https://img.shields.io/badge/firmware-v1.1-blue)]()
+[![Hardware](https://img.shields.io/badge/hardware-Arduino_UNO_R4_WiFi-blue)]()
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 ---
 
-### ⏳ Phase 2: Production System (Future)
+![Schematic](schematic.png)
 
-Multi-plant system with cloud connectivity and mobile app.
+---
 
-**Hardware:** ESP32 • 6× sensors • 6× pumps • Water level sensor • 3D printed enclosure
+## How It Works
 
-**Features:** Mobile app control • Arduino IoT Cloud • Multi-device management • Per-plant configuration
+**Dry cycle** — Moisture is logged every 15 minutes. Auto-watering fires only after **two consecutive readings** below the minimum threshold (default 55%), avoiding false triggers from sensor noise.
 
-| Documentation | Description |
-|--------------|-------------|
-| [BOM_FINAL.md](BOM_FINAL.md) | 6-plant system parts list and cost analysis (~$140-240) |
+**Incremental watering** — On the first trigger, the pump delivers an initial 50 mL dose, then waits 15 minutes for capillary absorption before re-reading. If moisture is still below the target (75%), additional 10 mL increments are delivered with 1-minute soak times between each. If moisture fails to rise after pumping, the system halts to prevent flooding.
 
-## 💡 How It Works
+---
 
-### Intelligent Watering Algorithm
+## Key Design Decisions
 
-The system uses a research-based **two-phase cycle** to prevent the most common DIY watering mistakes:
+| Decision | What | Why |
+|---|---|---|
+| Capacitive sensor | Cytron MCP6004-based | No electrolytic corrosion; lasts 1–2+ years vs weeks for resistive |
+| DIS pin control | Sensor powered via D2 | Only energized during readings; extends sensor life, reduces parasitic current |
+| 14-bit ADC | `analogReadResolution(14)` | 16 384 steps vs 1 024; far better moisture resolution |
+| Median sampling | 10 samples, bubble sort | Rejects outliers; more stable than averaging alone |
+| Peristaltic pump | 12V S-3Z type | Safe to run dry, precise dosing, no gravity siphoning |
+| MOSFET switch | IRLZ44N logic-level | Silent, fast, no coil current; flyback diode (1N5819) on pump |
+| Incremental watering | 50 mL initial + 10 mL steps | Prevents overwatering; allows soil absorption between doses |
+| Soak times | 15 min initial / 1 min increment | Waits for capillary propagation before re-reading moisture |
+| Dry-reading debounce | 2 consecutive low readings | Avoids watering on transient sensor noise |
+| EEPROM circular log | 246 entries × 4 bytes | ~2.7 days of history at 15-min intervals; survives reboots |
+| Backlight auto-sleep | 1 min timeout | Reduces LCD wear; wakes on any button press |
 
-**Watering Phase:** Waters in 50mL increments with 5-minute soak time until upper limit (80%) reached
+---
 
-**Dry Cycle Phase:** Checks every 6 hours, only waters when moisture drops to lower limit (10%)
+## Documentation
 
-**Key Features:**
-- **Moisture Propagation Wait**: 5 minutes for capillarity after each watering
-- **Incremental Watering**: Prevents flooding by watering in small amounts
-- **Failsafe Protection**: Stops if moisture doesn't increase (detects failures)
-- **Per-Plant Configuration**: All parameters configurable (Phase 2)
+| File | Contents |
+|---|---|
+| [BOM.md](BOM.md) | Parts list with Allegro.pl / Botland.pl links and cost (~500 PLN) |
+| [WATERING_LOGIC.md](WATERING_LOGIC.md) | Dry-cycle and incremental watering algorithm explained |
+| [MENU_DESIGN.md](MENU_DESIGN.md) | 16×2 LCD menu structure, screen layouts, EEPROM map, state machine |
+| [LESSONS_DEEP_RESEARCH.md](LESSONS_DEEP_RESEARCH.md) | Research findings from 50+ community projects |
+| [watering/](watering/) | Firmware (v1.1), build guide, changelog |
 
-**Detailed explanation:** [WATERING_LOGIC.md](WATERING_LOGIC.md) • [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md#watering-logic-with-moisture-propagation)
+---
 
-### Sensor Longevity Design
-
-Unlike typical DIY projects where sensors fail within months, this system:
-
-- **Powers sensors from GPIO** → only energized during readings (seconds per hour vs. continuous)
-- **Uses proper waterproofing** → nail polish coating prevents PCB corrosion
-- **Averages 20+ readings** → reduces noise and improves accuracy
-
-**Result:** Sensor lifespan extended from 3-6 months → 1-2+ years
-
-**Implementation details:** [WIRING_POC.md - Soil Moisture Sensor](WIRING_POC.md#soil-moisture-sensor-wiring)
-
-## 🛠️ Quick Start
-
-### Building the POC (Phase 1)
-
-1. **📦 Order Components** → See [BOM_POC.md](BOM_POC.md) for complete parts list with links (~550 PLN / ~$140 USD)
-
-2. **🎨 Waterproof Sensor** → Apply 2 coats of clear nail polish to sensor PCB (critical for longevity!)
-
-3. **🔌 Wire Hardware** → Follow [WIRING_POC.md](WIRING_POC.md) for complete breadboard layout and pin assignments
-
-4. **💻 Upload Firmware** → See [src/poc/README.md](src/poc/README.md) for complete upload instructions and dependencies
-
-5. **⚙️ Calibrate** → Use LCD menu to calibrate sensor (air + water) and pump flow rate
-
-6. **🌱 Configure & Test** → Set target humidity, dry cycle parameters, and test manual watering
-
-**Detailed guide:** See individual documentation files linked above for step-by-step instructions.
-
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 plant-watering-system/
-├── 📄 README.md                 # Project overview (you are here)
-├── 📄 PROJECT_OVERVIEW.md       # Detailed specs, features, best practices
-├── 📄 WATERING_LOGIC.md         # Two-phase watering algorithm explained
-├── 📄 lessons_learned.md        # Research findings from 50+ DIY projects
-│
-├── 📋 Phase 1: POC Documentation
-│   ├── BOM_POC.md               # Parts list with Allegro.pl/Botland.pl links
-│   ├── WIRING_POC.md            # Complete wiring guide and pin assignments
-│   └── MENU_DESIGN.md           # 16×2 LCD menu system design
-│
-├── 📋 Phase 2: Production Documentation
-│   └── BOM_FINAL.md             # 6-plant system parts and cost analysis
-│
-└── 💻 src/                      # Firmware
-    ├── poc/                     # Phase 1: Arduino UNO R4 WiFi code (ready to upload)
-    └── final/                   # Phase 2: Multi-plant with cloud (future)
+├── README.md
+├── BOM.md
+├── WATERING_LOGIC.md
+├── MENU_DESIGN.md
+├── LESSONS_DEEP_RESEARCH.md
+└── watering/
+    ├── README.md           # Build and upload guide
+    ├── build.md            # Wiring, pin assignments, MOSFET circuit
+    ├── BOM_WATERING.md     # Watering-system-specific BOM
+    ├── CHANGELOG.md        # Firmware version history
+    └── src/
+        └── plant_watering/
+            └── plant_watering.ino
 ```
 
-## ⚠️ Common DIY Mistakes to Avoid
-
-Based on research from 50+ failed DIY watering projects:
-
-| ❌ Common Mistake | ✅ This Project's Solution |
-|------------------|---------------------------|
-| Resistive sensors corrode in weeks | Capacitive sensors with waterproofing |
-| Sensors always powered → fail in months | GPIO-powered → only on during readings |
-| Constant watering → root rot | Dry cycle logic with configurable thresholds |
-| Immediate re-watering → overwatering | Soak time waits for moisture propagation |
-| ESP32 WiFi doesn't reconnect | Explicit reconnection logic in firmware |
-| Submersible pumps die if run dry | Peristaltic pumps safe to run dry |
-| No verification if watering worked | Failsafe checks moisture increase |
-
-📚 **Full research:** [lessons_learned.md](lessons_learned.md)
-
-## 🤝 Contributing
-
-This is a personal home project, but contributions are welcome! Ways to help:
-
-- 🐛 Report issues or bugs
-- 💡 Suggest improvements
-- 📝 Share calibration data for different soil types
-- 🔧 Contribute firmware improvements or mobile app features
-
 ---
 
-## 📜 License
+## License
 
-MIT License - Feel free to use, modify, and share this project.
-
----
-
-## 🙏 Acknowledgments
-
-This project builds on the collective knowledge of the maker community:
-- Reddit: /r/arduino, /r/esp32, /r/homeautomation
-- Hackster.io, Instructables, GitHub projects
-- Maker blogs and forums
-
-Special thanks to everyone who documented their failures and successes—your shared knowledge made this project possible.
-
----
-
-## 📞 Contact & Support
-
-- **Issues:** Use GitHub Issues for bug reports or questions
-- **Discussions:** Use GitHub Discussions for general questions
-- **Documentation:** All guides are in the repository (see links above)
-
-**Ready to start?** Begin with [BOM_POC.md](BOM_POC.md) to order components, then follow [WIRING_POC.md](WIRING_POC.md) for assembly!
+MIT

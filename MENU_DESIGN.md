@@ -1,592 +1,386 @@
-# LCD Menu System Design - POC
+# LCD Menu System Design — v1.1
+
+Hardware: Arduino UNO R4 WiFi · 16×2 I2C LCD · 4 buttons
 
 ## Button Layout
-- **UP:** Navigate up through menu items
-- **DOWN:** Navigate down through menu items
-- **SELECT:** Enter submenu or confirm selection
-- **BACK:** Return to previous menu or cancel
+
+| Button | Pin | Function |
+|--------|-----|----------|
+| UP | D4 | Navigate up / increase value |
+| DOWN | D5 | Navigate down / decrease value |
+| SELECT | D6 | Confirm / enter submenu / toggle |
+| BACK | D7 | Cancel / return to previous screen |
+
+Debounce delay: **200 ms**
+
+---
+
+## Default Configuration
+
+| Parameter | Default | Unit | Notes |
+|-----------|---------|------|-------|
+| Target humidity | 75 | % | Stop watering at this moisture |
+| Min threshold | 55 | % | Start watering below this |
+| Initial water amount | 50 | mL | First pump dose |
+| Increment water amount | 10 | mL | Subsequent doses |
+| Check interval | 6 | hours | Dry cycle check frequency |
+| Soak time (initial) | 15 | min | Wait after first pump |
+| Soak time (increment) | 1 | min | Wait between increments |
+| Sensor dry ADC | 11850 | — | 14-bit ADC value in air |
+| Sensor wet ADC | 7700 | — | 14-bit ADC value in water @ 60cm |
+| Pump rate | 1.67 | mL/s | Typical S-3Z peristaltic pump |
+| Backlight timeout | 1 | min | LCD auto-sleep |
+| Sensor warmup | 1000 | ms | Stabilisation delay after power-on |
+| Num samples | 10 | — | Median filter sample count |
+| Sample delay | 100 | ms | Delay between samples |
+| Log interval | 15 | min | EEPROM circular buffer write rate |
+| Watering enabled | ON | — | Auto-watering active by default |
+
+---
 
 ## Menu Structure
 
 ```
-MAIN MENU
-├── 1. Current Status
-│   ├── Display: Moisture: XX%
-│   ├── Display: Target: XX%
-│   ├── Display: Status: [Dry Cycle/Ready/Watering]
-│   └── [BACK to return]
+STATUS_SCREEN (default idle)
 │
-├── 2. Manual Water
-│   ├── Confirm: "Water now?"
-│   ├── [SELECT] → Execute watering
-│   └── [BACK] → Cancel
-│
-├── 3. Settings
-│   ├── 3.1 Target Humidity
-│   │   ├── Display current: "Target: XX%"
-│   │   ├── [UP/DOWN] Adjust (0-100%)
-│   │   ├── [SELECT] Save
-│   │   └── [BACK] Cancel
-│   │
-│   ├── 3.2 Min Threshold
-│   │   ├── Display current: "Min: XX%"
-│   │   ├── [UP/DOWN] Adjust (0-100%)
-│   │   ├── [SELECT] Save
-│   │   └── [BACK] Cancel
-│   │
-│   ├── 3.3 Water Amount
-│   │   ├── Display current: "Amount: X.Xs" or "XXmL"
-│   │   ├── [UP/DOWN] Adjust
-│   │   ├── [SELECT] Save
-│   │   └── [BACK] Cancel
-│   │
-│   ├── 3.4 Check Interval
-│   │   ├── Display current: "Check: XXh"
-│   │   ├── [UP/DOWN] Adjust (1-24 hours)
-│   │   ├── [SELECT] Save
-│   │   └── [BACK] Cancel
-│   │
-│   ├── 3.5 Soak Time
-│   │   ├── Display current: "Soak: XXm"
-│   │   ├── [UP/DOWN] Adjust (1-30 minutes)
-│   │   ├── [SELECT] Save
-│   │   └── [BACK] Cancel
-│   │
-│   ├── 3.6 Dry Cycle
-│   │   ├── Display current: "Dry Cycle: ON/OFF"
-│   │   ├── [UP/DOWN] Toggle
-│   │   ├── [SELECT] Save
-│   │   └── [BACK] Cancel
-│   │
-│   └── 3.7 Back to Main
-│
-├── 4. Calibration
-│   ├── 4.1 Calibrate Sensor
-│   │   ├── Step 1: "Sensor in air"
-│   │   │   ├── [SELECT] Read dry value
-│   │   │   └── Display: "Dry: XXXX"
-│   │   ├── Step 2: "Sensor in water"
-│   │   │   ├── [SELECT] Read wet value
-│   │   │   └── Display: "Wet: XXXX"
-│   │   ├── [SELECT] Save calibration
-│   │   └── [BACK] Cancel
-│   │
-│   ├── 4.2 Calibrate Pump
-│   │   ├── Instructions: "Place tube in measuring cup"
-│   │   ├── "Pump for 10s"
-│   │   ├── [SELECT] Run pump
-│   │   ├── Input: "Enter mL:"
-│   │   │   ├── [UP/DOWN] Adjust value
-│   │   │   └── [SELECT] Calculate mL/s
-│   │   └── [BACK] Cancel
-│   │
-│   └── 4.3 Back to Main
-│
-├── 5. System Info
-│   ├── Display: Firmware version
-│   ├── Display: Uptime
-│   ├── Display: WiFi status (future)
-│   └── [BACK] Return
-│
-└── 6. Reset Settings
-    ├── Confirm: "Reset to defaults?"
-    ├── [SELECT] → Reset all
-    └── [BACK] → Cancel
+└── [any button] → MAIN_MENU (6 items, scroll one at a time)
+    ├── 1.Settings     → SETTINGS_MENU (12 items)
+    │   ├── Target %          → SETTING_TARGET
+    │   ├── Min Thresh %      → SETTING_MIN
+    │   ├── Init Water mL     → SETTING_AMOUNT_INITIAL
+    │   ├── Incr Water mL     → SETTING_AMOUNT_INCREMENT
+    │   ├── Check hrs         → SETTING_INTERVAL
+    │   ├── Soak min          → SETTING_SOAK_TIME
+    │   ├── Soak Incr min     → SETTING_SOAK_TIME_INCREMENT
+    │   ├── Log min           → SETTING_LOG_INTERVAL
+    │   ├── Warmup ms         → SETTING_SENSOR_WARMUP
+    │   ├── Samples           → SETTING_NUM_MEASUREMENTS
+    │   ├── Delay ms          → SETTING_MEASUREMENT_DELAY
+    │   └── Backlight         → SETTING_BACKLIGHT_TIMEOUT
+    │
+    ├── 2.Calibrate    → CALIBRATE_MENU
+    │   ├── 1.Sensor   → CAL_SENSOR_MENU
+    │   │   ├── 1.Measure Air   → CAL_SENSOR_AIR   → CAL_SENSOR_DONE
+    │   │   └── 2.Measure Water → CAL_SENSOR_WATER  → CAL_SENSOR_DONE
+    │   └── 2.Pump     → CAL_PUMP_START → CAL_PUMP_RUNNING
+    │                               [BACK stops pump] → CAL_PUMP_ENTER_ML
+    │                                                 → CAL_PUMP_DONE
+    │
+    ├── 3.Manual Water → MANUAL_WATER_CONFIRM → waterPlant() → STATUS_SCREEN
+    ├── 4.Download Log → DOWNLOAD_CONFIRM → downloadLog() → STATUS_SCREEN
+    ├── 5.Reset        → RESET_CONFIRM → saveDefaults() → STATUS_SCREEN
+    └── 6.Watering: ON/OFF  [SELECT toggles, saves immediately]
 ```
 
 ---
 
-## Screen Layout Examples (16×2 LCD) - **YOUR DISPLAY**
+## Screen Layout Examples (16×2 LCD)
 
-**Note:** These layouts are optimized for your 16×2 I2C LCD from the GeeekPi kit.
+### Status Screen (idle)
 
-### Main Menu - Idle Screen (Auto-cycling display)
-The idle screen cycles through information every 3 seconds:
-
-**Screen 1: Moisture Status**
 ```
 ┌────────────────┐
-│Moist:75% T:80% │ ← Current moisture : Target
-│Status:DRY CYCLE│ ← Current state
+│Moisture: 68%   │
+│OK              │
 └────────────────┘
 ```
 
-**Screen 2: Next Check Time**
+Line 2 variants:
+
+| Condition | Line 2 |
+|-----------|--------|
+| Watering disabled | `Watering: OFF  ` |
+| Moisture ≤ minThreshold, 2nd dry reading | `Dry! Watering  ` |
+| Moisture ≤ minThreshold, 1st dry reading | `Need water!    ` |
+| Moisture > minThreshold | `OK             ` |
+
+### Main Menu
+
+Shows one item at a time. UP/DOWN scrolls; SELECT enters.
+
 ```
 ┌────────────────┐
-│Moist:75% T:80% │
-│Next chk: 1h30m │ ← Time until next check
+│1.Settings      │
+│Press SELECT    │
 └────────────────┘
 ```
 
-**Screen 3: Last Watering**
+Item 6 (Watering toggle):
+
 ```
 ┌────────────────┐
-│Moist:75% T:80% │
-│Last:2h ago 5mL │ ← Time since last watering + amount
+│6.Watering: ON  │
+│Press SELECT    │
 └────────────────┘
 ```
 
-### Main Menu - Navigation
+### Settings Menu
+
 ```
 ┌────────────────┐
-│>Status  Manual │ ← Selected item has '>'
-│ Config   Cal   │ ← Settings=Config, Calibration=Cal
-└────────────────┘
-
-Press UP/DOWN to move selection:
-┌────────────────┐
-│ Status >Manual │
-│ Config   Cal   │
-└────────────────┘
-
-Continue scrolling:
-┌────────────────┐
-│ Manual >Config │
-│ Cal    Info    │
+│Target %        │
+│Press SELECT    │
 └────────────────┘
 ```
 
-### 1. Current Status - Detailed View
-**Page 1:**
+### Setting Adjustment Screen
+
 ```
 ┌────────────────┐
-│Current: 75%    │
-│Target:  80%    │
+│Target:         │
+│75% (UP/DN)     │
 └────────────────┘
 ```
 
-**Page 2:** (auto-advance after 2 seconds)
 ```
 ┌────────────────┐
-│Min Thr: 20%    │ ← Dry cycle minimum
-│Dry Cyc: ON     │
+│Init:           │
+│50mL (UP/DN)    │
 └────────────────┘
 ```
 
-**Page 3:**
 ```
 ┌────────────────┐
-│Check:   2h     │ ← Check interval
-│Amount:  10mL   │ ← Watering amount
+│Soak:           │
+│15min (UP/DN)   │
 └────────────────┘
 ```
 
-### 2. Manual Water - Confirmation
+BACK saves and returns to settings list.
+
+### Calibrate Menu
+
 ```
 ┌────────────────┐
-│Water now?      │
-│SEL=Yes BCK=No  │
+│1.Sensor        │
+│Press SELECT    │
 └────────────────┘
 ```
 
-**During watering:**
+### Sensor Calibration — Measure Air
+
 ```
 ┌────────────────┐
-│WATERING...     │
-│Time: 3.5s      │
+│1.Measure Air   │
+│Press SELECT    │
 └────────────────┘
 ```
 
-**After watering:**
+During measurement:
+
 ```
 ┌────────────────┐
-│Done! 75%->82%  │ ← Before -> After
-│Press any key   │
+│Air: 11850      │
+│SELECT to save  │
 └────────────────┘
 ```
 
-### 3. Settings Menu
-**Main settings menu:**
+### Sensor Calibration — Measure Water
+
 ```
 ┌────────────────┐
-│>Target   Min   │ ← Target Humidity, Min Threshold
-│ Amount  Check  │
-└────────────────┘
-
-Next page:
-┌────────────────┐
-│>Soak    DryCyc │ ← Soak Time, Dry Cycle
-│ Back           │
+│2.Measure Water │
+│Press SELECT    │
 └────────────────┘
 ```
 
-### 3.1 Settings - Target Humidity
 ```
 ┌────────────────┐
-│Target:    80%  │
-│UP/DN SEL=Save  │
-└────────────────┘
-
-While adjusting (blinks):
-┌────────────────┐
-│Target:   [85%] │ ← Brackets show editing
-│UP/DN SEL=Save  │
+│Water: 7700     │
+│SELECT to save  │
 └────────────────┘
 ```
 
-### 3.2 Settings - Min Threshold
+After saving either:
+
 ```
 ┌────────────────┐
-│Min Thr:   20%  │
-│UP/DN SEL=Save  │
+│Cal saved!      │
+│Dry=11850 Wet=7700│
 └────────────────┘
 ```
 
-### 3.3 Settings - Water Amount
+### Pump Calibration
+
 ```
 ┌────────────────┐
-│Amount:   10mL  │
-│UP/DN SEL=Save  │
+│Pump Calibration│
+│SELECT to run   │
 └────────────────┘
 ```
 
-### 3.4 Settings - Check Interval
+Running (press BACK to stop):
+
 ```
 ┌────────────────┐
-│Check:     2h   │
-│UP/DN SEL=Save  │
+│Pump running... │
+│5s (BACK stop)  │
 └────────────────┘
 ```
 
-### 3.5 Settings - Soak Time
+Enter collected mL:
+
 ```
 ┌────────────────┐
-│Soak:      5m   │
-│UP/DN SEL=Save  │
+│Enter mL:15     │
+│UP/DN then SELECT│
 └────────────────┘
 ```
 
-### 3.6 Settings - Dry Cycle
+Done:
+
 ```
 ┌────────────────┐
-│Dry Cycle: ON   │
-│UP/DN SEL=Save  │
+│Rate: 1.67mL/s  │
+│Press BACK      │
 └────────────────┘
 ```
 
-### 4. Calibration Menu
+### Manual Watering
+
 ```
 ┌────────────────┐
-│>Sensor  Pump   │
-│ Back           │
+│Manual Watering?│
+│SELECT=yes BACK=no│
 └────────────────┘
 ```
 
-### 4.1 Calibrate Sensor - Step 1 (Dry)
+### Download Log
+
 ```
 ┌────────────────┐
-│Put sensor in   │
-│AIR, press SEL  │
-└────────────────┘
-
-After reading:
-┌────────────────┐
-│Dry: 3100       │ ← Raw ADC value
-│Press SEL       │
+│Download Log    │
+│SELECT=yes BACK=no│
 └────────────────┘
 ```
 
-### 4.1 Calibrate Sensor - Step 2 (Wet)
-```
-┌────────────────┐
-│Put sensor in   │
-│WATER, press SEL│
-└────────────────┘
+SELECT outputs CSV to Serial at 115200 baud (timestamp index, moisture %, raw ADC, flags).
 
-After reading:
-┌────────────────┐
-│Wet: 1500       │
-│SEL=Save BCK=X  │
-└────────────────┘
-```
+### Reset to Defaults
 
-### 4.2 Calibrate Pump - Step 1
-```
-┌────────────────┐
-│Place tube in   │
-│cup, press SEL  │
-└────────────────┘
-```
-
-**During 10s pump run:**
-```
-┌────────────────┐
-│PUMPING... 7s   │ ← Countdown
-│                │
-└────────────────┘
-```
-
-**Enter amount collected:**
-```
-┌────────────────┐
-│Collected: 15mL │ ← Adjust with UP/DOWN
-│SEL=Save BCK=X  │
-└────────────────┘
-
-After save:
-┌────────────────┐
-│Rate: 1.5mL/s   │ ← Calculated rate
-│Saved!          │
-└────────────────┘
-```
-
-### 5. System Info
-**Page 1:**
-```
-┌────────────────┐
-│FW: v1.0        │ ← Firmware version
-│Uptime: 3d 5h   │
-└────────────────┘
-```
-
-**Page 2:** (auto-advance)
-```
-┌────────────────┐
-│WiFi: Connected │ ← Future feature
-│IP:192.168.1.50 │
-└────────────────┘
-```
-
-### 6. Reset Settings
 ```
 ┌────────────────┐
 │Reset to        │
-│defaults?SEL=YES│
+│Defaults? SEL/BCK│
 └────────────────┘
-
-After confirmation:
-┌────────────────┐
-│Resetting...    │
-│Please wait     │
-└────────────────┘
-
-Done:
-┌────────────────┐
-│Reset complete! │
-│Press any key   │
-└────────────────┘
-```
-
-### Error Messages
-**Sensor disconnected:**
-```
-┌────────────────┐
-│ERROR: Sensor!  │
-│Check wiring    │
-└────────────────┘
-```
-
-**Water level low:**
-```
-┌────────────────┐
-│ALERT: Low H2O! │
-│Refill tank     │
-└────────────────┘
-```
-
-**Watering failed:**
-```
-┌────────────────┐
-│ERR: No change  │
-│Check pump/sens │
-└────────────────┘
-```
-
----
-
-## Screen Layout for 20×4 LCD (Reference Only - Not Your Display)
-
-**Note:** These are kept for reference if you upgrade to 20×4 LCD later.
-
-### Main Menu - Idle Screen
-```
-┌────────────────────┐
-│Plant Water System  │
-│Moisture:  75%      │
-│Target:    80%      │
-│Status: Dry Cycle   │
-└────────────────────┘
 ```
 
 ---
 
 ## Navigation State Machine
 
-### State Definitions:
 ```cpp
 enum MenuState {
-    MAIN_IDLE,          // Show current status
-    MAIN_MENU,          // Menu selection
-    MANUAL_WATER,       // Manual watering confirmation
-    SETTINGS_MENU,      // Settings submenu
-    SETTING_TARGET,     // Adjust target humidity
-    SETTING_MIN,        // Adjust minimum threshold
-    SETTING_AMOUNT,     // Adjust watering amount
-    SETTING_INTERVAL,   // Adjust check interval
-    SETTING_SOAK_TIME,  // Adjust soak time after watering
-    SETTING_DRY_CYCLE,  // Toggle dry cycle
-    CAL_MENU,           // Calibration submenu
-    CAL_SENSOR,         // Sensor calibration wizard
-    CAL_PUMP,           // Pump calibration wizard
-    SYSTEM_INFO,        // Display system information
-    RESET_CONFIRM       // Reset confirmation
+    STATUS_SCREEN,
+    MAIN_MENU,
+    SETTINGS_MENU,
+    SETTING_TARGET,
+    SETTING_MIN,
+    SETTING_AMOUNT_INITIAL,
+    SETTING_AMOUNT_INCREMENT,
+    SETTING_INTERVAL,
+    SETTING_SOAK_TIME,
+    SETTING_SOAK_TIME_INCREMENT,
+    SETTING_LOG_INTERVAL,
+    SETTING_SENSOR_WARMUP,
+    SETTING_NUM_MEASUREMENTS,
+    SETTING_MEASUREMENT_DELAY,
+    SETTING_BACKLIGHT_TIMEOUT,
+    CALIBRATE_MENU,
+    CAL_SENSOR_MENU,
+    CAL_SENSOR_AIR,
+    CAL_SENSOR_WATER,
+    CAL_SENSOR_DONE,
+    CAL_PUMP_START,
+    CAL_PUMP_RUNNING,
+    CAL_PUMP_ENTER_ML,
+    CAL_PUMP_DONE,
+    MANUAL_WATER_CONFIRM,
+    MANUAL_WATER_RUNNING,
+    DOWNLOAD_MENU,
+    DOWNLOAD_CONFIRM,
+    DOWNLOAD_PROGRESS,
+    RESET_CONFIRM
 };
 ```
 
-### Button Actions by State:
+### Button Actions by State
 
 | State | UP | DOWN | SELECT | BACK |
-|-------|-----|------|--------|------|
-| MAIN_IDLE | Enter menu | Enter menu | Enter menu | - |
-| MAIN_MENU | Previous item | Next item | Enter submenu | Return to idle |
-| MANUAL_WATER | - | - | Execute water | Cancel |
-| SETTINGS_MENU | Previous item | Next item | Enter setting | Return to main |
-| SETTING_TARGET | Increase value | Decrease value | Save & exit | Cancel & exit |
-| SETTING_MIN | Increase value | Decrease value | Save & exit | Cancel & exit |
-| SETTING_AMOUNT | Increase value | Decrease value | Save & exit | Cancel & exit |
-| SETTING_INTERVAL | Increase value | Decrease value | Save & exit | Cancel & exit |
-| SETTING_SOAK_TIME | Increase value | Decrease value | Save & exit | Cancel & exit |
-| SETTING_DRY_CYCLE | Toggle value | Toggle value | Save & exit | Cancel & exit |
-| CAL_MENU | Previous item | Next item | Enter calibration | Return to main |
-| CAL_SENSOR | - | - | Next step | Cancel & exit |
-| CAL_PUMP | Increase value | Decrease value | Save/next | Cancel & exit |
+|-------|----|------|--------|------|
+| STATUS_SCREEN | → MAIN_MENU | → MAIN_MENU | → MAIN_MENU | — |
+| MAIN_MENU | prev item | next item | enter item | → STATUS_SCREEN |
+| SETTINGS_MENU | prev item | next item | enter setting | → MAIN_MENU |
+| SETTING_* | increase | decrease | — | save → SETTINGS_MENU |
+| CALIBRATE_MENU | prev item | next item | enter | → MAIN_MENU |
+| CAL_SENSOR_MENU | prev item | next item | enter step | → CALIBRATE_MENU |
+| CAL_SENSOR_AIR/WATER | — | — | save → CAL_SENSOR_DONE | → CAL_SENSOR_MENU |
+| CAL_SENSOR_DONE | — | — | → CALIBRATE_MENU | → CAL_SENSOR_MENU |
+| CAL_PUMP_START | — | — | → CAL_PUMP_RUNNING | → CALIBRATE_MENU |
+| CAL_PUMP_RUNNING | — | — | — | stop pump → CAL_PUMP_ENTER_ML |
+| CAL_PUMP_ENTER_ML | increase | decrease | calc rate → CAL_PUMP_DONE | → CAL_PUMP_START |
+| CAL_PUMP_DONE | — | — | — | → CALIBRATE_MENU |
+| MANUAL_WATER_CONFIRM | — | — | waterPlant() → STATUS | → STATUS |
+| DOWNLOAD_CONFIRM | — | — | downloadLog() → STATUS | → STATUS |
+| RESET_CONFIRM | — | — | saveDefaults() → STATUS | → STATUS |
 
 ---
 
-## Configuration Storage (EEPROM)
+## EEPROM Memory Map
 
-### Memory Map:
-```cpp
-// EEPROM addresses (ESP32 has EEPROM emulation in flash)
-#define EEPROM_MAGIC_ADDR       0    // 2 bytes: Magic number (0xA5C3)
-#define EEPROM_TARGET_ADDR      2    // 1 byte: Target humidity (0-100)
-#define EEPROM_MIN_ADDR         3    // 1 byte: Min threshold (0-100)
-#define EEPROM_AMOUNT_ADDR      4    // 2 bytes: Water amount (mL × 10)
-#define EEPROM_INTERVAL_ADDR    6    // 1 byte: Check interval (hours)
-#define EEPROM_SOAK_TIME_ADDR   7    // 1 byte: Soak time (minutes)
-#define EEPROM_DRY_CYCLE_ADDR   8    // 1 byte: Dry cycle enable (0/1)
-#define EEPROM_CAL_DRY_ADDR     9    // 2 bytes: Sensor dry ADC value
-#define EEPROM_CAL_WET_ADDR     11   // 2 bytes: Sensor wet ADC value
-#define EEPROM_PUMP_RATE_ADDR   13   // 4 bytes: Pump rate (mL/s as float)
-#define EEPROM_CHECKSUM_ADDR    17   // 1 byte: Simple checksum
+Header: **40 bytes** (addresses 0–39). Data: addresses 40–1023 (circular buffer).
 
-// Total used: 18 bytes
+```
+Addr  Size  Field
+   0     2  Magic number (0xA5C3)
+   2     2  Firmware version
+   4     1  Target humidity (0–100)
+   5     1  Min threshold (0–100)
+   6     2  Initial water amount (mL × 10)
+   8     2  Increment water amount (mL × 10)
+  10     1  Check interval (hours)
+  11     1  Soak time after initial pump (minutes)
+  12     1  Soak time between increments (minutes)
+  13     2  Sensor dry ADC (14-bit)
+  15     2  Sensor wet ADC (14-bit)
+  17     4  Pump rate (float, mL/s)
+  21     2  Backlight timeout (minutes)
+  23     2  Sensor warmup (milliseconds)
+  25     1  Number of measurements (5–50)
+  26     2  Measurement delay (milliseconds)
+  28     2  Log interval (minutes)
+  30     4  Circular buffer write pointer
+  34     4  Total entries written
+  38     1  Watering enabled (0=off, 1=on)
+  39     1  (reserved / alignment)
+  40  984  Log data: 246 entries × 4 bytes each
+            Entry layout: moisture% (1B) | rawADC high (1B) | rawADC low (1B) | flags (1B)
 ```
 
-### Default Values:
-```cpp
-struct Config {
-    uint8_t targetHumidity = 80;      // 80%
-    uint8_t minThreshold = 20;        // 20%
-    uint16_t waterAmount = 100;       // 10.0mL (stored as mL × 10)
-    uint8_t checkInterval = 2;        // 2 hours
-    uint8_t soakTime = 5;             // 5 minutes (moisture propagation time)
-    bool dryCycleEnabled = true;      // ON
-    uint16_t sensorDry = 3100;        // Typical air reading
-    uint16_t sensorWet = 1500;        // Typical water reading
-    float pumpRate = 1.0;             // 1.0 mL/second
-};
-```
+Log flags: `0x00` normal · `0x01` watering started · `0x02` watering complete
 
 ---
 
-## Value Adjustment Behavior
+## Value Adjustment Steps
 
-### Increment/Decrement Steps:
-| Parameter | Step Size | Min | Max | Unit |
-|-----------|-----------|-----|-----|------|
-| Target Humidity | 5% | 0 | 100 | % |
-| Min Threshold | 5% | 0 | 100 | % |
-| Water Amount | 0.5 (5 in storage) | 0 | 99.9 | mL |
-| Check Interval | 1 | 1 | 24 | hours |
-| Soak Time | 1 | 1 | 30 | minutes |
-| Dry Cycle | toggle | OFF | ON | bool |
-| Calibration values | Manual input | - | - | ADC/mL |
-
-### Long Press Behavior (Optional Enhancement):
-- Hold UP/DOWN for >1 second → Fast increment (10× step size)
-- Useful for large adjustments
+| Parameter | Step | Min | Max |
+|-----------|------|-----|-----|
+| Target / Min threshold | 1% | 0 | 100 |
+| Initial / Increment water | 1 mL (10 in storage) | 1 mL | 500 mL |
+| Check interval | 1 h | 1 | 24 |
+| Soak time (both) | 1 min | 1 | 30 |
+| Log interval | 1 min | 1 | 60 |
+| Sensor warmup | 1 ms (display) | 100 | 2000 |
+| Num samples | 1 | 5 | 50 |
+| Measurement delay | 1 ms | 10 | 500 |
+| Backlight timeout | 1 min | 1 | 60 |
 
 ---
 
-## User Feedback
+## Timing
 
-### Visual Feedback:
-- **Cursor position:** `>` symbol for selected menu item
-- **Edit mode:** `[ value ]` brackets around editable value
-- **Progress:** Animated dots during watering `...`
-- **Alerts:** `!` symbol for warnings (low water, sensor error)
-
-### Audio Feedback (Optional with Buzzer):
-- Button press: Short beep (50ms)
-- Save setting: Double beep
-- Error: Long beep (500ms)
-- Watering complete: Success jingle
-
----
-
-## Error States and Messages
-
-| Error Condition | Display Message | Action |
-|----------------|-----------------|--------|
-| Sensor disconnected | "ERR: Sensor!" | Stop watering, alert |
-| Water not increasing | "ERR: No water?" | Enter failsafe mode |
-| Invalid EEPROM | "Loading defaults" | Reset to defaults |
-| Calibration invalid | "CAL: Invalid!" | Prompt recalibration |
-| Moisture > 100% | "CHK: Sensor" | Display warning |
-
----
-
-## Timing Considerations
-
-### Button Debouncing:
-- Debounce delay: 50ms
-- Long press threshold: 1000ms (for fast adjust)
-
-### Screen Update Rate:
-- Idle screen: Update moisture every 2-5 seconds
-- Menu navigation: Update immediately on button press
-- Value adjustment: Update immediately on button press
-- Watering progress: Update every 100ms
-
-### Sensor Reading During Menu:
-- Continue periodic sensor reads in background
-- Update idle screen when returned to main
-- Allow manual watering from any menu state (emergency)
-
----
-
-## Implementation Notes
-
-### Libraries Needed:
-```cpp
-#include <LiquidCrystal_I2C.h>  // I2C LCD control
-#include <EEPROM.h>              // Configuration storage
-```
-
-### Key Functions:
-```cpp
-void updateDisplay();            // Refresh LCD based on current state
-void handleButton(Button btn);   // Process button press
-void saveConfig();               // Write config to EEPROM
-void loadConfig();               // Read config from EEPROM
-void resetConfig();              // Load defaults
-void calibrateSensor();          // Sensor calibration wizard
-void calibratePump();            // Pump calibration wizard
-int readMoisture();              // Read and convert sensor to %
-void waterPlant(int targetPercent); // Execute watering
-```
-
----
-
-## Future Enhancements (Phase 2)
-
-When transitioning to cloud-connected final product:
-- Menu system becomes secondary (mobile app primary)
-- LCD shows minimal info: WiFi status, current moisture, last watering
-- Buttons could be reduced to: Manual water, WiFi reset
-- Configuration moves to mobile app
-- LCD optional (cost savings) - LEDs only for status
-
-**Recommendation:** Keep full menu system in POC for standalone testing and validation of all logic before adding cloud complexity.
+- Button debounce: **200 ms**
+- Display update (status screen): every **2 s**
+- Auto-watering check: every **logInterval** minutes (default 15 min)
+- Watering triggers after **2 consecutive** below-threshold readings
+- Backlight auto-sleep: after **backlightTimeout** minutes of inactivity (default 1 min)
