@@ -143,7 +143,6 @@ Firmware builds and the watering-logic tests pass. The hardware path (ADC readin
 - [ ] Enclosure, reservoir (below plant level) and tubing layout; opaque tubing, 5–6 mm ID
 - [ ] Waterproof each sensor with 2 coats of clear nail polish before use
 - [ ] Write a wiring/assembly guide with photos
-- [ ] Delete the leftover `monitor/` folder once KiCad is closed
 
 ## License
 
