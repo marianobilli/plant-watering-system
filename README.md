@@ -80,6 +80,27 @@ See [hardware/BOM.md](hardware/BOM.md). Power is a single 5 V / 2 A USB-C charge
 
 Details: [docs/lessons_learned.md](docs/lessons_learned.md), [docs/WATERING_LOGIC.md](docs/WATERING_LOGIC.md).
 
+## Tuning and best practices
+
+**Soak time** (wait after each dose before re-measuring): sandy/fast-draining soil 3–5 min, loam 5–10 min, clay/slow-draining 10–15 min. Default 5 min.
+
+**Sensors:** capacitive only (resistive ones corrode in weeks), waterproofed with nail polish; calibrate in the real soil, not just air/water; use a TLC555-based sensor on 3.3 V systems, not NE555.
+
+**Mechanical:** keep the reservoir **below** plant level (above it, water keeps siphoning after the pump stops); opaque tubing, 5–6 mm ID (narrower clogs); a closed-end hose with ~1 mm holes at each plant distributes more evenly than Y-splitters; flush with plain water and descale with vinegar when it clogs.
+
+**Maintenance schedule**
+
+| Interval | Task |
+|----------|------|
+| Weekly | Check reservoir level, test a pump manually, look for odd moisture readings or sensor drift |
+| Monthly | Inspect tubing for algae/scale, compare readings with a finger test, check connectors for corrosion |
+| Quarterly | Inspect sensor waterproofing, recalibrate if drifting, clean reservoir with vinegar, check MOSFETs/diodes |
+| Yearly | **Replace peristaltic pump tubing** (it wears out), deep-clean reservoir and tubing, replace corroded sensors, test failsafes (unplugged sensor, empty reservoir) |
+
+Act immediately if: readings disagree with the soil, a pump runs but no water flows, watering becomes erratic, or you see corrosion on a sensor or wire.
+
+**If WiFi is added later:** the ESP32 does not reliably reconnect on its own, so check `WiFi.status()` in `loop()` and call `WiFi.reconnect()`; use a static IP, a 20 MHz router channel and better than −70 dBm signal. Keep sensors on ADC1 (ADC2 is unusable while WiFi is on). For deep sleep, wait ~500 ms after waking before reading RTC memory and use `1000000ULL` for the timer constant.
+
 ## Status
 
 Firmware builds and the watering-logic tests pass. The hardware path (ADC readings, OLED menu, pumps) has **not yet been run on a board**. The earlier single-plant Arduino UNO R4 firmware and docs are kept in `docs/archive/` and in git history.
@@ -122,7 +143,7 @@ Firmware builds and the watering-logic tests pass. The hardware path (ADC readin
 ### Mechanical / docs
 - [ ] Enclosure, reservoir (below plant level) and tubing layout; opaque tubing, 5–6 mm ID
 - [ ] Waterproof each sensor with 2 coats of clear nail polish before use
-- [ ] Update `docs/PROJECT_OVERVIEW.md` for the ESP32 design and write a wiring/assembly guide with photos
+- [ ] Write a wiring/assembly guide with photos
 - [ ] Delete the leftover `monitor/` folder once KiCad is closed
 
 ## License
