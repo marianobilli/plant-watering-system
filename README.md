@@ -45,7 +45,6 @@ hardware/
 docs/
   WATERING_LOGIC.md       The two-phase algorithm with worked examples
   lessons_learned.md      Research from 50+ failed DIY projects
-  kicad9-schematic-documentation.md
   archive/                Superseded Arduino UNO R4 POC / single-plant monitor docs
 ```
 
