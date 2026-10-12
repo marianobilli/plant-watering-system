@@ -11,28 +11,68 @@ The script copies the board to a temp folder, refills the copper pours, runs DRC
 | File | Use for | Plated holes |
 |------|---------|--------------|
 | `plant_watering-gerbers.zip` | PCBWay, JLCPCB and most other makers | As drawn in KiCad (= finished size) |
-| `plant_watering-gerbers-prototypy.zip` | [prototypy.com](https://prototypy.com) | Every plated component hole +0.1 mm |
+| `plant_watering-gerbers-prototypy.zip` | [prototypy.com](https://www.prototypy.com) (Satland Prototype, Gdańsk) | Every plated component hole +0.1 mm, rounded up to a drill they stock; formats per their instructions (below) |
 
-Each zip holds the Gerbers (F/B copper, F/B mask, F/B silkscreen with mask subtracted, Edge.Cuts), the Gerber job file and two Excellon drill files (PTH and NPTH, mm). No paste layers: the board is all through-hole. The KiCad project itself is never modified; re-run the script after any board change.
+Each zip holds the Gerbers (F/B copper, F/B mask, F/B silkscreen with mask subtracted, Edge.Cuts), the Gerber job file and two Excellon drill files (PTH and NPTH). No paste layers: the board is all through-hole. The KiCad project itself is never modified; re-run the script after any board change.
 
 ## Why two versions: plated hole size
 
 KiCad drill sizes are **finished** hole sizes, after plating.
 
 - **PCBWay, JLCPCB** and most large makers read them that way: they drill slightly larger on their side so the plated hole comes out at the drawn size (typical tolerance ±0.08 mm). Send the standard zip unchanged.
-- **prototypy.com** drills the drawn size and the plating then makes the hole about 0.1 mm smaller. Their order form says: *"Plated holes have smaller diameters, so please increase their sizes in project by 0.1mm."* Without that, the 1.0 mm header holes would finish at ~0.9 mm, too tight for 0.64 mm square pins (0.9 mm across the corners). The prototypy zip grows all 155 plated pad holes by 0.1 mm. Vias stay at 0.3 mm (no pins go through them) and the non-plated M3 holes stay at 3.2 mm. DRC is still clean with the larger holes (annular rings and clearances OK).
+- **prototypy.com** drills the drawn size and the plating then makes the hole about 0.1 mm smaller. Their order form says: *"Plated holes have smaller diameters, so please increase their sizes in project by 0.1mm."* Without that, the 1.0 mm header holes would finish at ~0.9 mm, too tight for 0.64 mm square pins (0.9 mm across the corners). The prototypy zip grows all 155 plated pad holes by 0.1 mm and rounds up to the next drill in [their stock list](https://www.prototypy.com/t/69,Bore) (0.95 + 0.1 = 1.05 is not stocked, so 1.1). Vias stay at 0.3 mm (no pins go through them) and the non-plated M3 holes stay at 3.2 mm. DRC is still clean with the larger holes, and every pad is at least 0.60 mm bigger than its hole (their minimum is hole + 0.44 mm).
 
 | Hole | Count | Standard | prototypy |
 |------|------:|---------:|----------:|
 | Vias | 22 | 0.30 | 0.30 |
 | Resistors, electrolytic caps | 28 | 0.80 | 0.90 |
-| JST-XH 4-pin (sensors) | 24 | 0.95 | 1.05 |
+| JST-XH 4-pin (sensors) | 24 | 0.95 | 1.10 |
 | ESP and UI sockets, JST-XH 2-pin | 69 | 1.00 | 1.10 |
 | MOSFETs (TO-220), diodes (DO-41) | 30 | 1.10 | 1.20 |
 | MT3608 corner pins | 4 | 1.50 | 1.60 |
 | M3 mounting (NPTH) | 11 | 3.20 | 3.20 |
 
 If you use another maker, check whether their drill sizes mean finished or drilled holes. If drilled, use the prototypy zip (or change `PROTOTYPY_EXTRA_MM` in the script).
+
+## prototypy.com file format
+
+Their instructions: [Gerber page](https://www.prototypy.com/t/67,Gerbers) and the [KiCad guide (PDF, 2007)](https://www.prototypy.com/uploads/KiCad-27.08.2007_en.pdf).
+
+| They ask for | prototypy zip | |
+|---|---|---|
+| Layers: top/bottom copper, top/bottom solder mask, top/bottom silkscreen, board outline | F.Cu, B.Cu, F.Mask, B.Mask, F.Silkscreen, B.Silkscreen, Edge.Cuts | ✓ |
+| (Extended) Gerber, absolute coordinates, ASCII | RS-274X, absolute, ASCII. Plain format for older CAM software: no X2 attributes (`--no-x2`), no aperture macros (`--disable-aperture-macros`) | ✓ |
+| Gerber in inches, 2:3, leading zeros omitted | **mm, 4.6, leading zeros omitted.** KiCad cannot write inch Gerbers. The format and units are declared in every file (`%FSLAX46Y46*%`, `%MOMM*%`), which all RS-274X readers use. Say so in the order comments if unsure | ≈ |
+| Excellon drill: inches, decimal format, absolute origin, no drill sheet (KiCad guide) | Inches, decimal, absolute, no map | ✓ |
+| Tools file | Tool table in each `.drl` header, plus `plant_watering-drill_report.txt` listing every tool in mm and inches with hole counts | ✓ |
+| One drill file (`Wiertla.drl` in their guide) | Two files: `plant_watering-PTH.drl` (plated) and `plant_watering-NPTH.drl` (11 non-plated M3 holes). Their 2007 guide predates KiCad's NPTH support; separate files tell them which holes must **not** be plated. Mention it in the order comments | ≈ |
+
+### Order comment (paste into the prototypy.com order form)
+
+```text
+Dzień dobry,
+
+w załączniku pliki produkcyjne płytki plant_watering (2 warstwy, 143 x 112 mm, 1,6 mm).
+
+Gerbery: RS-274X, jednostki mm, format 4.6, współrzędne absolutne (jednostki i format
+są zadeklarowane w nagłówku każdego pliku, KiCad nie zapisuje Gerberów w calach).
+  - plant_watering-F_Cu.gtl / -B_Cu.gbl                    miedź góra / dół
+  - plant_watering-F_Mask.gts / -B_Mask.gbs                soldermaska góra / dół
+  - plant_watering-F_Silkscreen.gto / -B_Silkscreen.gbo    opis góra / dół (opis tylko na górze)
+  - plant_watering-Edge_Cuts.gm1                           obrys płytki
+
+Wiercenia: Excellon, cale, format dziesiętny, współrzędne absolutne.
+  - plant_watering-PTH.drl   otwory METALIZOWANE (177 szt.)
+  - plant_watering-NPTH.drl  otwory NIEMETALIZOWANE, 11 x 3,2 mm (otwory montażowe M3)
+                             - proszę ich nie metalizować
+  - plant_watering-drill_report.txt  lista narzędzi (średnice w mm i calach, ilości otworów)
+
+Średnice otworów metalizowanych są już powiększone o 0,1 mm zgodnie z Państwa zaleceniem
+i dobrane do dostępnych wierteł (0,3 / 0,9 / 1,1 / 1,2 / 1,6 mm) - proszę ich nie powiększać
+ponownie. Przelotki 0,3 mm pozostawiono bez zmian.
+
+Pozdrawiam
+```
 
 ## Order settings
 
