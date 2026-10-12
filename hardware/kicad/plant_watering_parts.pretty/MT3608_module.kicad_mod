@@ -20,4 +20,5 @@
   (pad "2" thru_hole circle (at -13 6.5) (size 2.4 2.4) (drill 1.5) (layers "*.Cu" "*.Mask"))
   (pad "3" thru_hole circle (at 13 -6.5) (size 2.4 2.4) (drill 1.5) (layers "*.Cu" "*.Mask"))
   (pad "4" thru_hole circle (at 13 6.5) (size 2.4 2.4) (drill 1.5) (layers "*.Cu" "*.Mask"))
+  (model "${KIPRJMOD}/plant_watering_parts.3dshapes/MT3608_module.step" (offset (xyz 0 0 0)) (scale (xyz 1 1 1)) (rotate (xyz 0 0 0)))
 )

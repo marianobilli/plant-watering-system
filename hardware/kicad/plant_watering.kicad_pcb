@@ -3152,6 +3152,17 @@
 			(uuid "069284d0-a54a-43d4-8ad1-e56e696b2b30")
 		)
 		(embedded_fonts no)
+		(model "${KIPRJMOD}/plant_watering_parts.3dshapes/UI_module_OLED_EC11.step"
+			(offset
+				(xyz 0 0 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 0)
+			)
+		)
 	)
 	(footprint "MountingHole:MountingHole_3.2mm_M3"
 		(layer "F.Cu")
@@ -7033,6 +7044,17 @@
 			(uuid "ed266423-6c82-435b-a76b-60387154f07f")
 		)
 		(embedded_fonts no)
+		(model "${KIPRJMOD}/plant_watering_parts.3dshapes/MT3608_module.step"
+			(offset
+				(xyz 0 0 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 0)
+			)
+		)
 	)
 	(footprint "MountingHole:MountingHole_3.2mm_M3"
 		(layer "F.Cu")
@@ -13212,6 +13234,17 @@
 			(uuid "e281df2a-4742-4dfa-b6fa-4bcaa1f3a9d9")
 		)
 		(embedded_fonts no)
+		(model "${KIPRJMOD}/plant_watering_parts.3dshapes/YD-ESP32-23.step"
+			(offset
+				(xyz 0 0 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 0)
+			)
+		)
 	)
 	(footprint "Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical"
 		(layer "F.Cu")

@@ -37,4 +37,5 @@
   (pad "7" thru_hole circle (at 15.24 0) (size 1.7 1.7) (drill 1) (layers "*.Cu" "*.Mask"))
   (pad "8" thru_hole circle (at 17.78 0) (size 1.7 1.7) (drill 1) (layers "*.Cu" "*.Mask"))
   (pad "9" thru_hole circle (at 20.32 0) (size 1.7 1.7) (drill 1) (layers "*.Cu" "*.Mask"))
+  (model "${KIPRJMOD}/plant_watering_parts.3dshapes/UI_module_OLED_EC11.step" (offset (xyz 0 0 0)) (scale (xyz 1 1 1)) (rotate (xyz 0 0 0)))
 )

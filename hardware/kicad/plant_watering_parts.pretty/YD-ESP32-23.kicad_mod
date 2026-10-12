@@ -56,4 +56,5 @@
   (pad "42" thru_hole circle (at 25.4 48.26) (size 1.7 1.7) (drill 1) (layers "*.Cu" "*.Mask"))
   (pad "43" thru_hole circle (at 25.4 50.80) (size 1.7 1.7) (drill 1) (layers "*.Cu" "*.Mask"))
   (pad "44" thru_hole circle (at 25.4 53.34) (size 1.7 1.7) (drill 1) (layers "*.Cu" "*.Mask"))
+  (model "${KIPRJMOD}/plant_watering_parts.3dshapes/YD-ESP32-23.step" (offset (xyz 0 0 0)) (scale (xyz 1 1 1)) (rotate (xyz 0 0 0)))
 )
