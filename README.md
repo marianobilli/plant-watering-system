@@ -41,6 +41,7 @@ lib/RotaryEncoder/        Quadrature encoder driver
 test/test_plant_logic/    Unity tests for lib/PlantLogic
 hardware/
   BOM.md                  Bill of materials, derived from the schematic
+  pcb_print_1to1_A4.pdf   1:1 printable board drawing (A4) for test-fitting parts and the enclosure
   kicad/                  plant_watering.kicad_{sch,pcb,pro} + project symbol/footprint libs
 docs/
   WATERING_LOGIC.md       The two-phase algorithm with worked examples
@@ -60,11 +61,38 @@ docs/
 | Encoder A / B / push | 5 / 4 / 6 |
 | Confirm / Back | 21 / 38 |
 
+![YD-ESP32-23 pinout](docs/yd-esp32-s3-devkitc-1-clone-pinout.jpg)
+
+> [!WARNING]
+> **Leave the ESP board's `IN-OUT` solder jumper open** (no solder bridge). The PCB powers the ESP from the charger through `5Vin` (footprint pad 21, left header, 2nd from the bottom; not GPIO21, which is pad 40). With the jumper open, the on-board diode keeps that 5 V from flowing back into the ESP's USB-C VBUS, so a laptop can stay plugged in for flashing and monitoring while the charger is connected. Bridged, the charger and the laptop's USB 5 V are tied together and current can be pushed back into the laptop's port. If your board arrives bridged, remove the solder. Before first power-up, check with a multimeter in diode mode (board unpowered): USB VBUS → `5Vin` reads a diode drop (~0.2–0.4 V), the reverse reads open.
+
+Header order, antenna end first (matches footprint pads 1–22 / 23–44):
+
+| Header | Pins |
+|--------|------|
+| P1 (pads 1–22) | 3V3, 3V3, RST, 4, 5, 6, 7, 15, 16, 17, 18, 8, 3, 46, 9, 10, 11, 12, 13, 14, 5Vin, GND |
+| P2 (pads 23–44) | GND, TX, RX, 1, 2, 42, 41, 40, 39, 38, 37, 36, 35, 0, 45, 48, 47, 21, 20, 19, GND, GND |
+
 Sensors are on ADC1 because ADC2 cannot be used while WiFi is active. Avoid IO0, 3, 45, 46 (strapping), 19/20 (USB) and 35–37 (octal PSRAM).
 
 ## Hardware
 
-See [hardware/BOM.md](hardware/BOM.md). Power is a single 5 V / 2 A USB-C charger; an on-board MT3608 boost module makes 12 V for the pumps. Open `hardware/kicad/plant_watering.kicad_pro` in KiCad 10.
+See [hardware/BOM.md](hardware/BOM.md). Power is a single 5 V / 2 A USB-C charger, plugged into a panel-mount USB-C socket on the enclosure ([photo](docs/usb-connector.png)) whose 6-pin JST-PH cable goes to J1; an on-board MT3608 boost module makes 12 V for the pumps. Open `hardware/kicad/plant_watering.kicad_pro` in KiCad 10.
+
+**UI module:** 1.3" 128×64 OLED + EC11 encoder + Back/Confirm buttons on one 64.9 × 35 mm board ([dimensions](docs/oled-rotary-encoder-dimensions.jpg)).
+
+![UI module: OLED, rotary encoder, Back and Confirm buttons](docs/oled-rotary-encoder.jpg)
+
+It mounts face-up to the left of the ESP32, turned 90° (header towards the ESP): its 9-pin header plugs into J2 (a 1×9 2.54 mm female socket) and four M3 brass standoffs screw it down through the matching holes in the J2 footprint. An 8.5 mm socket plus the header's 2.5 mm plastic spacer puts the module ~11 mm up, so use M3 × 11 mm standoffs (or 10 mm + a washer); measure your socket and header first. The module's male header must point out of its back; if the pins stick out of the display side, resolder the header. The socket's pin order matches the module silkscreen (CON SDA SCL PSH TRA TRB BAK GND VCC); VCC is 3V3.
+
+**1:1 printout:** [hardware/pcb_print_1to1_A4.pdf](hardware/pcb_print_1to1_A4.pdf) shows the board outline, pads with real drill sizes, silkscreen and part outlines at true scale on A4. Use it to check the space the board needs wherever it will be mounted (enclosure, standoffs, cable and connector clearance, access to the ESP's USB-C port) and to test-fit parts before ordering:
+
+1. Print on A4 at **Actual size / 100 %** (never "Fit to page").
+2. Check the scale: the board outline must measure **143 × 112 mm**, and the two ESP pin rows 25.4 mm apart.
+3. Glue it onto cardboard or foam board, pierce the pads with a pin and push in the real parts; lay it in the enclosure to check the mounting holes and cable routes.
+
+Regenerate it after any PCB change (from `hardware/kicad/`):
+`kicad-cli pcb export pdf --mode-single -l Edge.Cuts,F.Mask,F.SilkS,F.Fab --sp --black-and-white --ibt --scale 1 -o ../pcb_print_1to1_A4.pdf plant_watering.kicad_pcb`
 
 ## Common DIY mistakes this avoids
 
@@ -107,23 +135,14 @@ Firmware builds and the watering-logic tests pass. The hardware path (ADC readin
 ## TODO
 
 ### Before ordering the PCB
-- [ ] **Verify every footprint against the physical part** (datasheet or calipers), not just the library name:
-  - [ ] YD-ESP32-23 (`plant_watering_parts:YD-ESP32-23`): 25.4 mm row spacing is confirmed; check pin order and pad numbering against the vendor P1/P2 headers
-  - [ ] MT3608 module HW-183B (`MT3608_module`): hole spacing 23.4 × 12.7 mm and 1.5 mm drills were **estimated from a photo**; measure the real module
-  - [ ] USB-C receptacle GCT USB4125 (6P, horizontal): confirm it is the part you will actually buy and that the board edge placement fits
-  - [ ] JST-XH headers (B2B / B4B / B9B-XH-A): pads were shrunk to 1.7 mm round to keep old tracks clear; check against the JST drawing (pitch 2.5 mm, drill, keying side)
-  - [ ] IRLZ44N TO-220 (pin order G-D-S), 1N5819 DO-41 (10.16 mm pitch, cathode band), electrolytics D8 mm / P3.5 mm (polarity), 1/4 W resistors (10.16 mm pitch)
-  - [ ] Clear the remaining `lib_footprint_mismatch` / filter warnings in DRC or confirm each is intentional
-- [ ] Measure **ESP pin 21** (5 V input): some YD-ESP32-23 units wire it as a second 3V3 output; do not feed 5 V before checking
+- [ ] Verify the panel cable's pinout and match it to J1 (1 GND, 2 VBUS, 5 CC1, 6 CC2, 3/4 unused) before plugging in a charger
 - [ ] Consider moving the ESP so its antenna overhangs the board edge (needs a full re-route); until then the copper-pour keepout under the antenna is the mitigation
-- [ ] Re-run ERC/DRC with KiCad 10 after any change; clear the stale-library ERC warnings
-- [ ] Check the 3D model / print the PCB 1:1 on paper and test-fit the ESP, MT3608 and connectors
 - [ ] Generate Gerbers/drill files and review them in a viewer before sending to the fab
 
 ### Bring-up
 - [ ] Set the MT3608 output to **12 V with no pumps connected**, then check the +5 V and +3V3 rails
 - [ ] Verify the float switch polarity and wiring (contact closes to GND when the reservoir is low; leave J15 empty if unused)
-- [ ] Verify the UI module wiring on J2 (OLED I2C address and driver: SH1106 vs SSD1306, encoder direction, CON/BAK buttons)
+- [ ] Fit the UI module on J2 with its standoffs (height, hole alignment) and verify its wiring (OLED I2C address and driver: SH1106 vs SSD1306, encoder direction, CON/BAK buttons)
 - [ ] Flash and run the firmware on the real board for the first time (the OLED menu, ADC reads, pumps and NVS are untested on hardware)
 - [ ] Calibrate each sensor (air/water) and each pump (30 s into a cup); the 12-bit ADC defaults (3100 dry / 1500 wet) are only a guess
 - [ ] Check ADC noise and linearity at 11 dB attenuation with the shared DIS line; tune `SENSOR_WARMUP_MS` / `SENSOR_SAMPLES` if readings drift
