@@ -77,7 +77,7 @@ Sensors are on ADC1 because ADC2 cannot be used while WiFi is active. Avoid IO0,
 
 ## Hardware
 
-See [hardware/BOM.md](hardware/BOM.md). Power is a single 5 V / 2 A USB-C charger, plugged into a panel-mount USB-C socket on the enclosure ([photo](docs/usb-connector.png)) whose 6-pin JST-PH cable goes to J1; an on-board MT3608 boost module makes 12 V for the pumps. Open `hardware/kicad/plant_watering.kicad_pro` in KiCad 10.
+See [hardware/BOM.md](hardware/BOM.md). Power is a single 5 V / 2 A USB-C charger, plugged into a panel-mount USB-C socket on the enclosure ([photo](docs/usb-connector.png)) whose two wires (V+, V−) go to J1 (JST-XH 2-pin); an on-board MT3608 boost module makes 12 V for the pumps. Open `hardware/kicad/plant_watering.kicad_pro` in KiCad 10.
 
 **UI module:** 1.3" 128×64 OLED + EC11 encoder + Back/Confirm buttons on one 64.9 × 35 mm board ([dimensions](docs/oled-rotary-encoder-dimensions.jpg)).
 
@@ -135,7 +135,7 @@ Firmware builds and the watering-logic tests pass. The hardware path (ADC readin
 ## TODO
 
 ### Before ordering the PCB
-- [ ] Verify the panel cable's pinout and match it to J1 (1 GND, 2 VBUS, 5 CC1, 6 CC2, 3/4 unused) before plugging in a charger
+- [ ] Check the panel USB-C socket has 5.1 kΩ CC pull-downs built in (needed for C-to-C chargers) and verify V+/V− polarity to J1 (1 GND, 2 VBUS) before plugging in a charger
 - [ ] Consider moving the ESP so its antenna overhangs the board edge (needs a full re-route); until then the copper-pour keepout under the antenna is the mitigation
 - [ ] Generate Gerbers/drill files and review them in a viewer before sending to the fab
 

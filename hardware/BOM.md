@@ -10,8 +10,7 @@ Prices are rough USD estimates, not quotes.
 |----:|-----|------|-----------|-------|---------:|
 | 1 | U1 | YD-ESP32-23 (ESP32-S3, N16R8: 16 MB flash / 8 MB PSRAM) | 2×22 pin header, 25.4 mm row spacing | Plugs into female headers; use the **UART** USB-C port for flashing | 8–12 |
 | 1 | PS1 | MT3608 boost module, HW-183B (USB-C input, 4 corner holes) | `plant_watering_parts:MT3608_module` | 5 V → 12 V for the pumps. **Set output to 12 V before connecting pumps** | 2–3 |
-| 1 | J1 | JST-PH 6-pin header (B6B-PH-K) | `JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical` | Power in from the panel USB-C socket cable: 1 GND, 2 VBUS, 3/4 n.c. (D−/D+), 5 CC1, 6 CC2 | 0.5 |
-| 2 | R13, R14 | 5.1 kΩ, 1/4 W | DIN0207 axial | USB-C CC pull-downs (needed: the panel socket brings CC1/CC2 out on the cable) | <1 |
+| 1 | J1 | JST-XH 2-pin header (B2B-XH-A) | 2.5 mm vertical | Power in from the 2-wire panel USB-C socket: 1 GND, 2 VBUS (+5 V) | 0.5 |
 | 6 | Q1–Q6 | IRLZ44N logic-level N-MOSFET | TO-220-3 vertical | Pump low-side switches. Must be **IRLZ**, not IRF | 3–5 |
 | 6 | R1–R6 | 220 Ω, 1/4 W | DIN0207 axial | Gate series resistors | <1 |
 | 6 | R7–R12 | 10 kΩ, 1/4 W | DIN0207 axial | Gate pull-downs (pumps stay off during boot) | <1 |
@@ -34,14 +33,14 @@ PCB: 143 × 112 mm, 2 layers (fabrication order, ~5 pcs: 5–15 USD at a typical
 | 6 | Capacitive soil moisture sensor **with DIS pin** (4-pin: GND, VCC, DIS, OUT) | Powered from 3V3 so OUT is ADC-safe. 3-pin sensors will **not** work. Seal PCB edges with 2 coats of clear nail polish | 3 each |
 | 6 | 12 V peristaltic pump, ~100 mL/min, ~0.17 A | Only one pump runs at a time | 8–12 each |
 | 1 | UI module: SH1106 128×64 I²C OLED + rotary encoder (push) + 2 push buttons | Plugs into J2 and screws onto the board (64.9 × 35 mm, holes 59 × 29 mm). Its 9-pin male header must point out of the back; 3V3 powered | 6–10 |
-| 1 | Panel-mount USB-C socket with 6-pin JST-PH 2.0 cable (white, Letel, EAN 5906379381793) | Mounts in the enclosure wall, plugs into J1. **Check its wire order before plugging in** | 2–3 |
+| 1 | Panel-mount power-only USB-C socket with 2 wires (V+, V−) | Mounts in the enclosure wall; crimp an XH 2-pin housing on its wires for J1 (pin 1 V−/GND, pin 2 V+). It must have the 5.1 kΩ CC pull-downs built in, or a USB-C charger will not switch on 5 V (see open items) | 2–3 |
 | 1 | 5 V / 2 A USB-C charger and cable | Only source of power for the whole board | 5 |
 | 1 | Float switch (optional) | Normally open, closes when water is low; leave J15 empty if unused | 3–5 |
 | – | 5–6 mm ID opaque silicone tubing, ~10 m | Opaque prevents algae | 10–15 |
 | – | Reservoir (below plant level) | Keep below the plants to avoid siphoning | – |
-| 7 | JST-XH 2-pin housing (XHP-2) | Pump cables ×6 + float switch | <1 |
+| 8 | JST-XH 2-pin housing (XHP-2) | Pump cables ×6, float switch, USB-C power | <1 |
 | 6 | JST-XH 4-pin housing (XHP-4) | Sensor cables | <1 |
-| ~60 | JST-XH crimp contacts (SXH-001T-P0.6) | 38 needed (7×2 + 6×4) plus spares; or use pre-crimped XH leads instead | 2 |
+| ~60 | JST-XH crimp contacts (SXH-001T-P0.6) | 40 needed (8×2 + 6×4) plus spares; or use pre-crimped XH leads instead | 2 |
 | 1 | Crimp tool for JST-XH/PH (e.g. Engineer PA-09, IWISS SN-28B) | Only needed if crimping your own cables | 15–30 |
 
 ## Rough total
@@ -57,6 +56,6 @@ PCB: 143 × 112 mm, 2 layers (fabrication order, ~5 pcs: 5–15 USD at a typical
 ## Open items to verify before ordering
 
 - **MT3608 mounting holes:** measured: 30 × 17 mm module, hole centres 2 mm from each edge (26 × 13 mm spacing), 1.5 mm drills.
-- **USB-C panel cable pinout:** the seller gives no pinout. J1 expects 1 GND, 2 VBUS, 5 CC1, 6 CC2 (3/4 unused). Beep out each PH position to the socket's VBUS/GND/CC pins; re-pin the PH housing (or change J1's pin order) if it differs. CC1/CC2 and D+/D− are interchangeable; only VBUS/GND matter for safety.
+- **USB-C panel socket:** J1 only takes V+ and V− (1 GND, 2 VBUS), and the board has no CC resistors. A USB-C charger with a C-to-C cable only turns on 5 V if it sees 5.1 kΩ pull-downs on CC1/CC2, so the socket must have them on its own little PCB (most 2-wire power-only sockets do). If it doesn't, use a USB-A charger with an A-to-C cable. Check V+/V− polarity with a meter before plugging into J1.
 - **ESP header pin 21:** some YD-ESP32-23 units wire it as a second 3V3 output. Measure before feeding 5 V into it.
 - **Pump current:** sized for one pump at a time (0.17 A @ 12 V ≈ 0.5 A from the 5 V side). Do not enable concurrent pumping.

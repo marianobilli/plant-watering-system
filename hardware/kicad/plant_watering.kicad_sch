@@ -6982,264 +6982,6 @@
     		(embedded_fonts no)
     	)
   
-        	(symbol "Connector_Generic:Conn_01x06"
-    		(pin_names
-    			(offset 1.016)
-    			(hide yes)
-    		)
-    		(exclude_from_sim no)
-    		(in_bom yes)
-    		(on_board yes)
-    		(property "Reference" "J"
-    			(at 0 7.62 0)
-    			(effects
-    				(font
-    					(size 1.27 1.27)
-    				)
-    			)
-    		)
-    		(property "Value" "Conn_01x06"
-    			(at 0 -10.16 0)
-    			(effects
-    				(font
-    					(size 1.27 1.27)
-    				)
-    			)
-    		)
-    		(property "Footprint" ""
-    			(at 0 0 0)
-    			(effects
-    				(font
-    					(size 1.27 1.27)
-    				)
-    				(hide yes)
-    			)
-    		)
-    		(property "Datasheet" ""
-    			(at 0 0 0)
-    			(effects
-    				(font
-    					(size 1.27 1.27)
-    				)
-    				(hide yes)
-    			)
-    		)
-    		(property "Description" "Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)"
-    			(at 0 0 0)
-    			(effects
-    				(font
-    					(size 1.27 1.27)
-    				)
-    				(hide yes)
-    			)
-    		)
-    		(property "ki_keywords" "connector"
-    			(at 0 0 0)
-    			(effects
-    				(font
-    					(size 1.27 1.27)
-    				)
-    				(hide yes)
-    			)
-    		)
-    		(property "ki_fp_filters" "Connector*:*_1x??_*"
-    			(at 0 0 0)
-    			(effects
-    				(font
-    					(size 1.27 1.27)
-    				)
-    				(hide yes)
-    			)
-    		)
-    		(symbol "Conn_01x06_1_1"
-    			(rectangle
-    				(start -1.27 6.35)
-    				(end 1.27 -8.89)
-    				(stroke
-    					(width 0.254)
-    					(type default)
-    				)
-    				(fill
-    					(type background)
-    				)
-    			)
-    			(rectangle
-    				(start -1.27 5.207)
-    				(end 0 4.953)
-    				(stroke
-    					(width 0.1524)
-    					(type default)
-    				)
-    				(fill
-    					(type none)
-    				)
-    			)
-    			(rectangle
-    				(start -1.27 2.667)
-    				(end 0 2.413)
-    				(stroke
-    					(width 0.1524)
-    					(type default)
-    				)
-    				(fill
-    					(type none)
-    				)
-    			)
-    			(rectangle
-    				(start -1.27 0.127)
-    				(end 0 -0.127)
-    				(stroke
-    					(width 0.1524)
-    					(type default)
-    				)
-    				(fill
-    					(type none)
-    				)
-    			)
-    			(rectangle
-    				(start -1.27 -2.413)
-    				(end 0 -2.667)
-    				(stroke
-    					(width 0.1524)
-    					(type default)
-    				)
-    				(fill
-    					(type none)
-    				)
-    			)
-    			(rectangle
-    				(start -1.27 -4.953)
-    				(end 0 -5.207)
-    				(stroke
-    					(width 0.1524)
-    					(type default)
-    				)
-    				(fill
-    					(type none)
-    				)
-    			)
-    			(rectangle
-    				(start -1.27 -7.493)
-    				(end 0 -7.747)
-    				(stroke
-    					(width 0.1524)
-    					(type default)
-    				)
-    				(fill
-    					(type none)
-    				)
-    			)
-    			(pin passive line
-    				(at -5.08 5.08 0)
-    				(length 3.81)
-    				(name "Pin_1"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    				(number "1"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    			)
-    			(pin passive line
-    				(at -5.08 2.54 0)
-    				(length 3.81)
-    				(name "Pin_2"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    				(number "2"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    			)
-    			(pin passive line
-    				(at -5.08 0 0)
-    				(length 3.81)
-    				(name "Pin_3"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    				(number "3"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    			)
-    			(pin passive line
-    				(at -5.08 -2.54 0)
-    				(length 3.81)
-    				(name "Pin_4"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    				(number "4"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    			)
-    			(pin passive line
-    				(at -5.08 -5.08 0)
-    				(length 3.81)
-    				(name "Pin_5"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    				(number "5"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    			)
-    			(pin passive line
-    				(at -5.08 -7.62 0)
-    				(length 3.81)
-    				(name "Pin_6"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    				(number "6"
-    					(effects
-    						(font
-    							(size 1.27 1.27)
-    						)
-    					)
-    				)
-    			)
-    		)
-    		(embedded_fonts no)
-    	)
   )
 	(text "6-PLANT WATERING SYSTEM - YD-ESP32-23 (ESP32-S3)\nSENSORS (ADC1, direct): S1=IO1 S2=IO2 S3=IO7 S4=IO8 S5=IO9 S6=IO10 | SENSOR DIS (shared): IO11\nPUMPS: PUMP1=IO15 PUMP2=IO17 PUMP3=IO39 PUMP4=IO12 PUMP5=IO16 PUMP6=IO18 (named after the channel each pin drives)\nUI MODULE (same pins as breathing-light firmware): SDA=IO14 SCL=IO13 CON=IO21 PSH=IO6 TRA=IO5 TRB=IO4 BAK=IO38; VCC=3V3 (not 5V)\nAvoid IO0 IO3 IO45 IO46 (strapping), IO19/20 (USB), IO35-37 (octal PSRAM on N16R8), IO43/44 (UART)\nGate network: 220R series + 10k pull-down. Flyback diode across each pump.\nPOWER: USB-C 5V/2A charger -> +5V rail -> (ESP 5V pin) and (MT3608 boost -> +12V for pumps). ESP 3V3 pin feeds sensors + UI module.\nRun ONE pump at a time (firmware). Pump ~0.17A @12V = ~0.5A from 5V. Set MT3608 trim to 12V BEFORE connecting anything.\nC5 470uF on 5V absorbs pump start-up current; soft-start pump with PWM if the ESP resets.\nFLOAT SWITCH (optional, reservoir low-water lockout): J15 pin1 -> IO47 (use INPUT_PULLUP in firmware), pin2 -> GND. Leave unpopulated if unused.\nPS1 footprint = MT3608 module HW-183B (30x17mm, USB-C input), 4 corner holes, spacing 23.4 x 12.7 mm ESTIMATED from photo: measure your module and fix the footprint before ordering. VIN+ top-left, VIN- bottom-left, OUT+ top-right, OUT- bottom-right.\nESP 5V pin: vendor schematic has a Schottky from pin 21 to the on-board LDO (keep IN-OUT jumper open). Some YD units wire pin 21 as 3V3 - measure before connecting +5V!"
 		(exclude_from_sim no)
@@ -7389,34 +7131,6 @@
 			(type default)
 		)
 		(uuid "2ca712dd-700d-42c9-b7d0-529f3a0a8539")
-	)
-	(wire
-		(pts
-			(xy 34.29 36.83) (xy 44.45 36.83)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "22456cd1-9229-407f-b71f-7378602e439e")
-	)
-	(wire
-		(pts
-			(xy 34.29 39.37) (xy 44.45 39.37)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9d08bb32-55c0-4fd3-ade1-b9305a1a3b91")
-	)
-	(no_connect
-		(at 34.29 31.75)
-		(uuid "4dc81303-113a-4eba-88d5-0bf056305349")
-	)
-	(no_connect
-		(at 34.29 34.29)
-		(uuid "e6ae56ad-a08b-41a3-8298-bcec391335c0")
 	)
 	(wire
 		(pts
@@ -7700,16 +7414,6 @@
 	)
 	(wire
 		(pts
-			(xy 44.45 36.83) (xy 55.88 36.83)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3dbab8e0-2d22-4b52-9760-b5ad0e25f043")
-	)
-	(wire
-		(pts
 			(xy 189.23 219.71) (xy 189.23 226.06)
 		)
 		(stroke
@@ -7897,16 +7601,6 @@
 			(type default)
 		)
 		(uuid "68d89efa-444c-4a49-bb48-08b8365987ea")
-	)
-	(wire
-		(pts
-			(xy 44.45 39.37) (xy 69.85 39.37)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6a8d79fb-b97a-4a3b-bc5e-fb1c5ea2695b")
 	)
 	(wire
 		(pts
@@ -8598,16 +8292,6 @@
 		)
 		(uuid "ff8d08a7-7664-412c-992a-763ef2e77eeb")
 	)
-	(label "CC2"
-		(at 44.45 39.37 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "0a2644d2-16ef-411b-bb63-eaa32e9e533f")
-	)
 	(label "PUMP2_SW"
 		(at 254 160.02 90)
 		(effects
@@ -8687,16 +8371,6 @@
 			(justify left bottom)
 		)
 		(uuid "79b4d0a4-eef5-479c-be15-4d3e3b50f609")
-	)
-	(label "CC1"
-		(at 44.45 36.83 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left bottom)
-		)
-		(uuid "7aaac023-80a8-4fc6-9b72-fc827e7e69fd")
 	)
 	(label "SENSOR_DIS"
 		(at 207.01 40.64 180)
@@ -9194,28 +8868,6 @@
 		(uuid "42be4cd1-2502-40eb-b67c-9c19bb26d62d")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 318.77 114.3 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-	)
-	(global_label "GND"
-		(shape bidirectional)
-		(at 63.5 36.83 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "455346c7-e758-4ab1-bc71-ed046dd0f7c4")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 63.5 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9788,28 +9440,6 @@
 		(uuid "b18d1a1d-6789-43f5-a82a-d7f384496702")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 318.77 233.68 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-	)
-	(global_label "GND"
-		(shape bidirectional)
-		(at 77.47 39.37 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "b48d7380-4eb3-44b5-b9de-670a25209b80")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 77.47 39.37 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12098,85 +11728,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 73.66 39.37 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "95e28744-bf1f-489d-a2cc-9a4b920d52bc")
-		(property "Reference" "R14"
-			(at 72.39 35.814 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "5.1k"
-			(at 74.676 35.56 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
-			(at 73.66 41.148 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 73.66 39.37 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 73.66 39.37 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c591188c-b22d-4938-922d-fe854a6510b5")
-		)
-		(pin "2"
-			(uuid "b7682af7-8fda-4334-9f13-28ab0ff05467")
-		)
-		(instances
-			(project "plant_watering"
-				(path "/44c71f65-c0c8-415d-9be8-1e5a85110f51"
-					(reference "R14")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:PWR_FLAG")
 		(at 104.14 22.86 0)
 		(unit 1)
@@ -13945,85 +13496,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:R")
-		(at 59.69 36.83 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "f9937c7b-eba4-44d1-b1cc-7c96fd607f43")
-		(property "Reference" "R13"
-			(at 58.166 33.274 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "5.1k"
-			(at 60.706 33.02 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
-			(at 59.69 38.608 90)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 59.69 36.83 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 59.69 36.83 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c7b3d508-c501-4f3a-a93a-dc72aadfff78")
-		)
-		(pin "2"
-			(uuid "ea27168d-528e-4b65-958f-3e09b2751fd4")
-		)
-		(instances
-			(project "plant_watering"
-				(path "/44c71f65-c0c8-415d-9be8-1e5a85110f51"
-					(reference "R13")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Connector_Generic:Conn_01x02")
 		(at 63.5 102.87 0)
 		(unit 1)
@@ -14199,7 +13671,7 @@
       )
     )
   )
-    (symbol (lib_id "Connector_Generic:Conn_01x06") (at 29.21 31.75 0) (mirror y) (unit 1)
+    (symbol (lib_id "Connector_Generic:Conn_01x02") (at 29.21 26.67 0) (mirror y) (unit 1)
     (body_style 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (in_pos_files yes) (dnp no)
     (uuid "c4849ce8-d4b0-4f18-9cab-6880b81c8b03")
     (property "Reference" "J1"
@@ -14212,8 +13684,8 @@
     				)
     			)
     )
-    (property "Value" "USB-C panel cable (PH2.0 6P)"
-      (at 29.21 41.91 0)
+    (property "Value" "USB-C panel socket (V+/V-)"
+      (at 29.21 31.75 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -14222,8 +13694,8 @@
     				)
     			)
     )
-    (property "Footprint" "Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical"
-      (at 29.21 31.75 0)
+    (property "Footprint" "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical"
+      (at 29.21 26.67 0)
       (hide yes)
       (show_name no)
       (do_not_autoplace no)
@@ -14233,8 +13705,8 @@
     				)
     			)
     )
-    (property "Datasheet" "https://www.usb.org/sites/default/files/documents/usb_type-c.zip"
-      (at 29.21 31.75 0)
+    (property "Datasheet" "~"
+      (at 29.21 26.67 0)
       (hide yes)
       (show_name no)
       (do_not_autoplace no)
@@ -14244,8 +13716,8 @@
     				)
     			)
     )
-    (property "Description" "USB Power-Only 6P Type-C Receptacle connector"
-      (at 29.21 31.75 0)
+    (property "Description" "Power in from a 2-wire panel USB-C socket: 1 GND, 2 VBUS"
+      (at 29.21 26.67 0)
       (hide yes)
       (show_name no)
       (do_not_autoplace no)
@@ -14257,10 +13729,6 @@
     )
     (pin "1" (uuid "4ae8a4cb-a854-4db6-9229-cba94341e280"))
     (pin "2" (uuid "61f31ab4-2cc1-40e5-94e1-d2ce6ddcb602"))
-    (pin "3" (uuid "5a7d42b2-a775-4de9-a2e1-768889cee109"))
-    (pin "4" (uuid "33be0707-0c9f-4719-b616-446c772eb259"))
-    (pin "5" (uuid "2ade9c08-16c5-4345-82f1-fa08f105a174"))
-    (pin "6" (uuid "bc1b92f0-e434-4f8d-a868-067d3801427b"))
     (instances
       (project "plant_watering"
         (path "/44c71f65-c0c8-415d-9be8-1e5a85110f51"
