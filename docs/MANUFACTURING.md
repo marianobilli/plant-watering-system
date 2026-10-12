@@ -49,27 +49,19 @@ Their instructions: [Gerber page](https://www.prototypy.com/t/67,Gerbers) and th
 
 ### Order comment (paste into the prototypy.com order form)
 
+Only the two points where the files differ from their instructions:
+
 ```text
 Dzień dobry,
 
-w załączniku pliki produkcyjne płytki plant_watering (2 warstwy, 143 x 112 mm, 1,6 mm).
+dwie uwagi do plików:
 
-Gerbery: RS-274X, jednostki mm, format 4.6, współrzędne absolutne (jednostki i format
-są zadeklarowane w nagłówku każdego pliku, KiCad nie zapisuje Gerberów w calach).
-  - plant_watering-F_Cu.gtl / -B_Cu.gbl                    miedź góra / dół
-  - plant_watering-F_Mask.gts / -B_Mask.gbs                soldermaska góra / dół
-  - plant_watering-F_Silkscreen.gto / -B_Silkscreen.gbo    opis góra / dół (opis tylko na górze)
-  - plant_watering-Edge_Cuts.gm1                           obrys płytki
+1. Gerbery są w milimetrach (RS-274X, format 4.6), nie w calach - KiCad nie zapisuje
+   Gerberów w calach. Jednostki i format są zadeklarowane w nagłówku każdego pliku.
 
-Wiercenia: Excellon, cale, format dziesiętny, współrzędne absolutne.
-  - plant_watering-PTH.drl   otwory METALIZOWANE (177 szt.)
-  - plant_watering-NPTH.drl  otwory NIEMETALIZOWANE, 11 x 3,2 mm (otwory montażowe M3)
-                             - proszę ich nie metalizować
-  - plant_watering-drill_report.txt  lista narzędzi (średnice w mm i calach, ilości otworów)
-
-Średnice otworów metalizowanych są już powiększone o 0,1 mm zgodnie z Państwa zaleceniem
-i dobrane do dostępnych wierteł (0,3 / 0,9 / 1,1 / 1,2 / 1,6 mm) - proszę ich nie powiększać
-ponownie. Przelotki 0,3 mm pozostawiono bez zmian.
+2. Wiercenia są w dwóch plikach Excellon (cale, format dziesiętny):
+   - plant_watering-PTH.drl  - otwory metalizowane,
+   - plant_watering-NPTH.drl - 11 otworów montażowych 3,2 mm, proszę ich NIE metalizować.
 
 Pozdrawiam
 ```
@@ -80,7 +72,7 @@ Pozdrawiam
 |---------|-------|
 | Layers | 2 |
 | Size | 143 × 112 mm, rounded corners (3 mm radius); standard shape, no milling, no V-cut |
-| Thickness | 1.6 mm |
+| Thickness | 1.6 mm (prototypy.com offers 1.5 mm: choose that; the board has only through-hole parts, so 0.1 mm thinner changes nothing) |
 | Copper | 35 µm (1 oz). Enough: under 1 A total; 0.6 mm traces carry ~1.6 A, the thinnest +12 V segment (0.45 mm) ~1.3 A for 0.17 A of load |
 | Holes per board | 188 (177 plated: 22 vias + 155 component holes; 11 non-plated) |
 | Hole plating (metalization) | Yes |
