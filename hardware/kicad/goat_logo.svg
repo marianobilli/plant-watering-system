@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80" width="100" height="80">
+  <!-- Goat silhouette facing right; each shape is a filled polygon for silkscreen import -->
+  <g fill="#000">
+    <!-- body -->
+    <path d="M20 36 Q22 30 34 31 L60 31 Q70 32 71 40 Q72 50 64 53 L28 54 Q19 53 19 44 Z"/>
+    <!-- tail -->
+    <path d="M21 35 L13 25 L16 24 L25 32 Z"/>
+    <!-- legs with hooves -->
+    <path d="M24 50 L29 50 L28 72 L30 75 L24 75 L24 72 Z"/>
+    <path d="M32 50 L37 50 L36 72 L38 75 L32 75 L32 72 Z"/>
+    <path d="M57 50 L62 50 L61 72 L63 75 L57 75 L57 72 Z"/>
+    <path d="M65 49 L70 47 L69 72 L71 75 L65 75 L65 72 Z"/>
+    <!-- neck -->
+    <path d="M60 33 L73 15 L81 19 L71 43 Z"/>
+    <!-- head and snout -->
+    <path d="M73 14 Q78 10 83 13 L93 22 Q95 26 91 28 L84 27 Q77 25 73 20 Z"/>
+    <!-- horn, sweeping back -->
+    <path d="M76 13 Q70 3 60 4 Q56 5 58 7 Q67 6 72 15 Z"/>
+    <!-- ear -->
+    <path d="M74 18 L63 20 L65 23 L75 21 Z"/>
+    <!-- beard -->
+    <path d="M84 26 L89 27 L86 37 Z"/>
+  </g>
+</svg>
