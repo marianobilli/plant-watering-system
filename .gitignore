@@ -27,3 +27,8 @@ Thumbs.db
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Case build outputs (case/print is tracked)
+case/out/
+case/ref/
+__pycache__/
